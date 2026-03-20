@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
+import SkillRadarChart from '../components/SkillRadarChart'
 import {
   buildCandidateFromGithub,
   createCandidate,
@@ -76,7 +77,10 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
           candidateId: ranked.candidate_id,
           score: ranked.score,
           explanation: ranked.explanation,
-          time_to_productivity_days: ranked.time_to_productivity_days,
+          time_to_productivity_pomodoros: ranked.time_to_productivity_pomodoros,
+          time_to_productivity_hours: ranked.time_to_productivity_hours,
+          time_to_productivity_sprints: ranked.time_to_productivity_sprints,
+          time_to_productivity_explanation: ranked.time_to_productivity_explanation,
           direct_matches: ranked.direct_matches,
           adjacent_support: ranked.adjacent_support,
           copilot: copilot.answer,
@@ -101,7 +105,9 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
       'jobId',
       'candidateId',
       'score',
-      'time_to_productivity_days',
+      'time_to_productivity_pomodoros',
+      'time_to_productivity_hours',
+      'time_to_productivity_sprints',
       'direct_matches',
       'adjacent_support',
       'bias_flags',
@@ -115,7 +121,9 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
       r.jobId,
       r.candidateId,
       r.score,
-      r.time_to_productivity_days ?? '',
+      r.time_to_productivity_pomodoros ?? '',
+      r.time_to_productivity_hours ?? '',
+      r.time_to_productivity_sprints ?? '',
       (r.direct_matches || []).join('|'),
       (r.adjacent_support || []).join('|'),
       (r.bias_flags || []).join('|'),
@@ -128,7 +136,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
 
     const csv = [
       headers.join(','),
-      ...lines.map((row) => `${row[0]},${row[1]},${row[2]},${row[3]},${row[4]},${row[5]},${row[6]},${row[7]},${row[8]},${row[9]},${row[10]},"${row[11]}"`),
+      ...lines.map((row) => `${row[0]},${row[1]},${row[2]},${row[3]},${row[4]},${row[5]},${row[6]},${row[7]},${row[8]},${row[9]},${row[10]},${row[11]},${row[12]},"${row[13]}"`),
     ].join('\n')
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -195,7 +203,14 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
               <h3>{r.candidateId}</h3>
               <span className="score">{Math.round(r.score * 100)}%</span>
             </div>
-            <p><strong>Estimated TTP:</strong> {r.time_to_productivity_days?.toFixed(1)} days</p>
+            <p>
+              <strong>Estimated TTP:</strong>{' '}
+              {r.time_to_productivity_pomodoros?.toFixed(1)} pomodoros
+              {' '}({r.time_to_productivity_hours?.toFixed(1)}h, ~{r.time_to_productivity_sprints?.toFixed(2)} sprints)
+            </p>
+            {r.time_to_productivity_explanation && (
+              <p><strong>What this means:</strong> {r.time_to_productivity_explanation}</p>
+            )}
             <p><strong>Repos:</strong> {r.ui?.repos ?? '-'} | <strong>Stars:</strong> {r.ui?.stars ?? '-'}</p>
             <p><strong>Direct matches:</strong> {r.direct_matches?.join(', ') || 'None'}</p>
             <p><strong>Adjacency support:</strong> {r.adjacent_support?.join('; ') || 'None'}</p>
@@ -223,6 +238,12 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
                 <p><strong>Mentor verdict:</strong> {r.codeforces.honest_skill_verdict.mentor_summary}</p>
               </div>
             )}
+
+            <div className="cf-block">
+              <h4>Candidate Skill Graph</h4>
+              <SkillRadarChart candidate={r} />
+              <p><strong>Adjacency map:</strong> {r.adjacent_support?.join('; ') || 'No adjacent transfer paths found for this role.'}</p>
+            </div>
             <details>
               <summary>Why this match?</summary>
               <p>{r.explanation}</p>

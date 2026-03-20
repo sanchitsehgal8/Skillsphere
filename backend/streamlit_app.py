@@ -305,9 +305,19 @@ Paste a real job description, enter a GitHub username, and SkillSphere will:
             st.markdown(f"**Match score:** {match.get('score', 0.0):.2f}")
             st.markdown(f"**Learning velocity:** {graph.learning_velocity:.2f}")
 
-            ttp_days = match.get("time_to_productivity_days")
-            if ttp_days is not None:
-                st.markdown(f"**Estimated time-to-productivity:** {ttp_days:.1f} days")
+            ttp_poms = match.get("time_to_productivity_pomodoros")
+            ttp_hours = match.get("time_to_productivity_hours")
+            ttp_sprints = match.get("time_to_productivity_sprints")
+            if ttp_poms is not None:
+                st.markdown(
+                    "**Estimated time-to-productivity:** "
+                    f"{ttp_poms:.1f} pomodoros (~{(ttp_hours or 0):.1f}h, "
+                    f"~{(ttp_sprints or 0):.2f} sprints)"
+                )
+
+            ttp_expl = match.get("time_to_productivity_explanation")
+            if ttp_expl:
+                st.markdown(f"**What this means:** {ttp_expl}")
 
             # Derive matched vs missing skills for explanation
             role_skill_names = [

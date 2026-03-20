@@ -9,18 +9,20 @@ export default function DashboardPage({ analyses, theme, onToggleTheme }) {
 
   function exportCsv() {
     if (!analyses.length) return
-    const headers = ['jobId', 'candidateId', 'score', 'time_to_productivity_days', 'explanation']
+    const headers = ['jobId', 'candidateId', 'score', 'time_to_productivity_pomodoros', 'time_to_productivity_hours', 'time_to_productivity_sprints', 'explanation']
     const lines = analyses.map((a) => [
       a.jobId,
       a.candidateId,
       a.score,
-      a.time_to_productivity_days ?? '',
+      a.time_to_productivity_pomodoros ?? '',
+      a.time_to_productivity_hours ?? '',
+      a.time_to_productivity_sprints ?? '',
       (a.explanation || '').replaceAll('"', '""'),
     ])
 
     const csv = [
       headers.join(','),
-      ...lines.map((row) => `${row[0]},${row[1]},${row[2]},${row[3]},"${row[4]}"`),
+      ...lines.map((row) => `${row[0]},${row[1]},${row[2]},${row[3]},${row[4]},${row[5]},"${row[6]}"`),
     ].join('\n')
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -71,7 +73,11 @@ export default function DashboardPage({ analyses, theme, onToggleTheme }) {
               <tr key={`${a.jobId}-${a.candidateId}`}>
                 <td>{a.candidateId}</td>
                 <td>{Math.round(a.score * 100)}%</td>
-                <td>{a.time_to_productivity_days ? `${a.time_to_productivity_days.toFixed(1)} days` : '-'}</td>
+                <td>
+                  {a.time_to_productivity_pomodoros
+                    ? `${a.time_to_productivity_pomodoros.toFixed(1)} pomodoros (~${(a.time_to_productivity_hours || 0).toFixed(1)}h)`
+                    : '-'}
+                </td>
                 <td className="reason-cell">{a.explanation}</td>
               </tr>
             ))}

@@ -118,7 +118,10 @@ async def run_matching(req: RunMatchingRequest) -> RunMatchingResponse:
             candidate_id=s.candidate_id,
             score=s.score,
             explanation=s.explanation,
-            time_to_productivity_days=s.time_to_productivity_days,
+            time_to_productivity_pomodoros=s.time_to_productivity_pomodoros,
+            time_to_productivity_hours=s.time_to_productivity_hours,
+            time_to_productivity_sprints=s.time_to_productivity_sprints,
+            time_to_productivity_explanation=s.time_to_productivity_explanation,
             direct_matches=s.direct_matches,
             adjacent_support=s.adjacent_support,
         )

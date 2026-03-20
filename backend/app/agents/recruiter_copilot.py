@@ -32,10 +32,16 @@ class RecruiterCopilotAgent:
         if match is not None:
             lines.append(f"Match score for job {match.job_id}: {match.score:.2f}")
             lines.append(f"Match rationale: {match.explanation}")
-            if match.time_to_productivity_days is not None:
+            if (
+                match.time_to_productivity_pomodoros is not None
+                and match.time_to_productivity_hours is not None
+                and match.time_to_productivity_sprints is not None
+            ):
                 lines.append(
-                    f"Estimated time-to-productivity: {match.time_to_productivity_days:.1f} days "
-                    "across core requirements.",
+                    "Time-to-productivity (TTP) = focused effort before independent role-level output. "
+                    f"Estimate: {match.time_to_productivity_pomodoros:.1f} pomodoros "
+                    f"(~{match.time_to_productivity_hours:.1f} hours, "
+                    f"~{match.time_to_productivity_sprints:.2f} sprints).",
                 )
             if match.direct_matches:
                 lines.append(
@@ -82,9 +88,16 @@ class RecruiterCopilotAgent:
                 continue
             lines.append(f"Rank {rank}: {cand.name} - score {match.score:.2f}")
             lines.append(f"  Learning velocity: {graph.learning_velocity:.2f}")
-            if match.time_to_productivity_days is not None:
+            if (
+                match.time_to_productivity_pomodoros is not None
+                and match.time_to_productivity_hours is not None
+                and match.time_to_productivity_sprints is not None
+            ):
                 lines.append(
-                    f"  Estimated time-to-productivity: {match.time_to_productivity_days:.1f} days",
+                    "  TTP: "
+                    f"{match.time_to_productivity_pomodoros:.1f} pomodoros "
+                    f"(~{match.time_to_productivity_hours:.1f}h, "
+                    f"~{match.time_to_productivity_sprints:.2f} sprints)",
                 )
             if match.direct_matches:
                 lines.append(

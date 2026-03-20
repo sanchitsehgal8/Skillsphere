@@ -7,9 +7,10 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
   const [minScore, setMinScore] = useState(0)
   const [onlyDirect, setOnlyDirect] = useState(false)
   const [onlyAdjacency, setOnlyAdjacency] = useState(false)
+  const [scoreSort, setScoreSort] = useState('default')
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       const matchesQuery = item.candidateId.toLowerCase().includes(query.toLowerCase())
       const matchesScore = (item.score || 0) * 100 >= minScore
       const hasDirect = (item.direct_matches || []).length > 0
@@ -18,15 +19,25 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
       const matchesAdj = !onlyAdjacency || hasAdj
       return matchesQuery && matchesScore && matchesDirect && matchesAdj
     })
-  }, [items, minScore, onlyAdjacency, onlyDirect, query])
+
+    if (scoreSort === 'desc') {
+      filtered.sort((a, b) => (b.score || 0) - (a.score || 0))
+    } else if (scoreSort === 'asc') {
+      filtered.sort((a, b) => (a.score || 0) - (b.score || 0))
+    }
+
+    return filtered
+  }, [items, minScore, onlyAdjacency, onlyDirect, query, scoreSort])
 
   function exportCsv() {
     if (!filteredItems.length) return
-    const headers = ['candidateId', 'score', 'time_to_productivity_days', 'direct_matches', 'adjacent_support']
+    const headers = ['candidateId', 'score', 'time_to_productivity_pomodoros', 'time_to_productivity_hours', 'time_to_productivity_sprints', 'direct_matches', 'adjacent_support']
     const rows = filteredItems.map((item) => [
       item.candidateId,
       item.score,
-      item.time_to_productivity_days ?? '',
+      item.time_to_productivity_pomodoros ?? '',
+      item.time_to_productivity_hours ?? '',
+      item.time_to_productivity_sprints ?? '',
       (item.direct_matches || []).join('|'),
       (item.adjacent_support || []).join('|'),
     ])
@@ -86,6 +97,14 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
           />
           Only with adjacency support
         </label>
+        <div className="sort-control">
+          <label>Sort by score</label>
+          <select value={scoreSort} onChange={(e) => setScoreSort(e.target.value)}>
+            <option value="default">Default</option>
+            <option value="desc">High to Low</option>
+            <option value="asc">Low to High</option>
+          </select>
+        </div>
       </div>
 
       <div className="candidate-grid">
@@ -97,7 +116,12 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
               <h3>{item.candidateId}</h3>
               <span className="pill">{Math.round(item.score * 100)}%</span>
             </div>
-            <p><strong>TTP:</strong> {item.time_to_productivity_days ? `${item.time_to_productivity_days.toFixed(1)} days` : 'n/a'}</p>
+            <p>
+              <strong>TTP:</strong>{' '}
+              {item.time_to_productivity_pomodoros
+                ? `${item.time_to_productivity_pomodoros.toFixed(1)} pomodoros (~${(item.time_to_productivity_hours || 0).toFixed(1)}h, ~${(item.time_to_productivity_sprints || 0).toFixed(2)} sprints)`
+                : 'n/a'}
+            </p>
             <p><strong>Direct matches:</strong> {item.direct_matches?.join(', ') || 'None'}</p>
             <p><strong>Adjacency support:</strong> {item.adjacent_support?.join('; ') || 'None'}</p>
           </div>

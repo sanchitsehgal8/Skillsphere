@@ -74,35 +74,38 @@ class MatchingAndRankingAgent:
                             best_adj_distance = dist
                             best_adj_desc = f"{node.name} -> {req.name} (distance {dist})"
 
-                # Time-to-productivity estimate for this requirement
-                # Shorter if direct skill is strong, longer if only adjacent
-                # skills exist; scaled by learning velocity.
+                # Time-to-productivity estimate (in pomodoros) for this requirement.
+                # 1 pomodoro = 25 minutes of focused work.
+                # Lower means the candidate can ship role-level output faster.
                 lv = max(0.0, min(1.0, graph.learning_velocity))
                 if best_direct_score >= 0.75:
-                    days = 7.0
+                    pomodoros = 4.0
                     direct_matches.append(req.name)
                 elif best_direct_score >= 0.4:
-                    days = 21.0
+                    pomodoros = 10.0
                     direct_matches.append(req.name)
                 elif best_adj_score > 0.0 and best_adj_distance is not None:
-                    base_days = {1: 45.0, 2: 75.0, 3: 110.0}.get(best_adj_distance, 120.0)
-                    days = base_days * (1.0 - 0.4 * lv)
+                    base_pomodoros = {1: 18.0, 2: 30.0, 3: 46.0}.get(best_adj_distance, 54.0)
+                    pomodoros = base_pomodoros * (1.0 - 0.45 * lv)
                     if best_adj_desc:
                         adjacent_support.append(best_adj_desc)
                 else:
-                    # No direct or adjacent coverage; assume long ramp-up.
-                    days = 150.0 * (1.0 - 0.3 * lv)
+                    # No direct or adjacent coverage; assume longer ramp-up.
+                    pomodoros = 64.0 * (1.0 - 0.35 * lv)
 
-                ttp_numer += days * max(weight, 0.1)
+                ttp_numer += pomodoros * max(weight, 0.1)
                 ttp_denom += max(weight, 0.1)
 
-            time_to_productivity = ttp_numer / ttp_denom if ttp_denom > 0 else None
+            ttp_pomodoros = ttp_numer / ttp_denom if ttp_denom > 0 else None
+            ttp_hours = (ttp_pomodoros * 25.0 / 60.0) if ttp_pomodoros is not None else None
+            # 1 sprint = 2 weeks = ~80 focused work hours baseline.
+            ttp_sprints = (ttp_hours / 80.0) if ttp_hours is not None else None
 
             # Incorporate present fit, learning velocity, and TTP into a single score.
-            if time_to_productivity is not None:
-                # Map days to [0,1] where faster ramp-up => higher potential.
-                ttp_clamped = max(0.0, min(180.0, time_to_productivity))
-                ttp_score = 1.0 - (ttp_clamped / 180.0)
+            if ttp_pomodoros is not None:
+                # Map effort to [0,1] where faster ramp-up => higher potential.
+                ttp_clamped = max(0.0, min(80.0, ttp_pomodoros))
+                ttp_score = 1.0 - (ttp_clamped / 80.0)
             else:
                 ttp_score = 0.5
 
@@ -118,11 +121,18 @@ class MatchingAndRankingAgent:
                 f"Cosine alignment (current skills vs requirements): {base_sim:.2f}.",
                 f"Learning velocity: {graph.learning_velocity:.2f}.",
             ]
-            if time_to_productivity is not None:
-                explanation_parts.append(
-                    f"Estimated time-to-productivity: {time_to_productivity:.1f} days "
-                    "across core requirements (lower is better).",
+            if ttp_pomodoros is not None and ttp_hours is not None and ttp_sprints is not None:
+                ttp_explanation = (
+                    "Time-to-productivity estimates focused effort needed before the candidate can "
+                    "deliver independently on core role tasks. "
+                    f"Estimated effort: {ttp_pomodoros:.1f} pomodoros (~{ttp_hours:.1f} hours, "
+                    f"~{ttp_sprints:.2f} sprints)."
                 )
+                explanation_parts.append(
+                    ttp_explanation,
+                )
+            else:
+                ttp_explanation = None
             if direct_matches:
                 explanation_parts.append(
                     "Directly satisfied requirements: " + ", ".join(sorted(set(direct_matches))) + ".",
@@ -142,7 +152,10 @@ class MatchingAndRankingAgent:
                     candidate_id=graph.candidate_id,
                     score=score,
                     explanation=explanation,
-                    time_to_productivity_days=time_to_productivity,
+                    time_to_productivity_pomodoros=ttp_pomodoros,
+                    time_to_productivity_hours=ttp_hours,
+                    time_to_productivity_sprints=ttp_sprints,
+                    time_to_productivity_explanation=ttp_explanation,
                     direct_matches=direct_matches,
                     adjacent_support=adjacent_support,
                 )

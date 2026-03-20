@@ -56,7 +56,10 @@ class MatchScore(BaseModel):
     candidate_id: str
     score: float
     explanation: str
-    time_to_productivity_days: float | None = None
+    time_to_productivity_pomodoros: float | None = None
+    time_to_productivity_hours: float | None = None
+    time_to_productivity_sprints: float | None = None
+    time_to_productivity_explanation: str | None = None
     direct_matches: List[str] = []
     adjacent_support: List[str] = []
 

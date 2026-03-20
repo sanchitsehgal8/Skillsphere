@@ -1,0 +1,3 @@
+# Project-level Python dependencies
+# Installs backend and Streamlit requirements.
+-r backend/requirements.txt
