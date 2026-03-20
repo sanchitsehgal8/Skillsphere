@@ -56,6 +56,9 @@ class MatchScore(BaseModel):
     candidate_id: str
     score: float
     explanation: str
+    time_to_productivity_days: float | None = None
+    direct_matches: List[str] = []
+    adjacent_support: List[str] = []
 
 
 class BiasFlag(BaseModel):

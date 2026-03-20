@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.job_intelligence import JobIntelligenceAgent, RoleRequirementGraph
 from app.agents.talent_scout import TalentScoutAgent, TalentSignals
@@ -22,6 +23,19 @@ from app.schemas.api import (
 )
 
 app = FastAPI(title="SkillSphere Talent Intelligence Engine")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # In-memory storage just for demo purposes
 _JOBS: Dict[str, RoleRequirementGraph] = {}
@@ -98,7 +112,14 @@ async def run_matching(req: RunMatchingRequest) -> RunMatchingResponse:
     audit_logs = _bias_agent.audit(job_graph.job.id, ranked_scores, candidates_by_id)
 
     ranked = [
-        RankedCandidate(candidate_id=s.candidate_id, score=s.score, explanation=s.explanation)
+        RankedCandidate(
+            candidate_id=s.candidate_id,
+            score=s.score,
+            explanation=s.explanation,
+            time_to_productivity_days=s.time_to_productivity_days,
+            direct_matches=s.direct_matches,
+            adjacent_support=s.adjacent_support,
+        )
         for s in ranked_scores
     ]
 

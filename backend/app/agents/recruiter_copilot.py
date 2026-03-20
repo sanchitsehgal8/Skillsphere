@@ -32,6 +32,23 @@ class RecruiterCopilotAgent:
         if match is not None:
             lines.append(f"Match score for job {match.job_id}: {match.score:.2f}")
             lines.append(f"Match rationale: {match.explanation}")
+            if match.time_to_productivity_days is not None:
+                lines.append(
+                    f"Estimated time-to-productivity: {match.time_to_productivity_days:.1f} days "
+                    "across core requirements.",
+                )
+            if match.direct_matches:
+                lines.append(
+                    "Directly satisfied requirements: "
+                    + ", ".join(sorted(set(match.direct_matches)))
+                    + ".",
+                )
+            if match.adjacent_support:
+                lines.append(
+                    "Adjacency-based potential: "
+                    + "; ".join(match.adjacent_support)
+                    + ".",
+                )
 
         if audit is not None and audit.bias_flags:
             reasons = "; ".join(f.reason for f in audit.bias_flags)
@@ -65,6 +82,18 @@ class RecruiterCopilotAgent:
                 continue
             lines.append(f"Rank {rank}: {cand.name} - score {match.score:.2f}")
             lines.append(f"  Learning velocity: {graph.learning_velocity:.2f}")
+            if match.time_to_productivity_days is not None:
+                lines.append(
+                    f"  Estimated time-to-productivity: {match.time_to_productivity_days:.1f} days",
+                )
+            if match.direct_matches:
+                lines.append(
+                    "  Direct: " + ", ".join(sorted(set(match.direct_matches))) + ".",
+                )
+            if match.adjacent_support:
+                lines.append(
+                    "  Adjacent support: " + "; ".join(match.adjacent_support) + ".",
+                )
             if audit and audit.bias_flags:
                 lines.append("  Bias flags present (see audit log).")
             lines.append("")

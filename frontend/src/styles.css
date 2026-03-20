@@ -1,0 +1,134 @@
+:root {
+  --bg: #070b16;
+  --bg-2: #0c1222;
+  --card: #111a2e;
+  --text: #f3f6ff;
+  --muted: #8ea0c6;
+  --accent: #1f7bff;
+  --accent-2: #37a0ff;
+  --border: #1d2a45;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: radial-gradient(circle at 20% 0%, #0f1a34, #060911 60%);
+  color: var(--text);
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 20px;
+  padding: 24px;
+}
+.login-left, .login-right {
+  background: rgba(13, 22, 41, 0.86);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 32px;
+}
+.login-left h1 { margin: 0 0 16px; font-size: 2.1rem; }
+.login-left h2 { font-size: 2.6rem; line-height: 1.1; max-width: 560px; }
+.login-left li { color: var(--muted); margin-bottom: 10px; }
+.login-right { max-width: 560px; justify-self: center; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.login-right input, .form-card input, .form-card textarea, .search {
+  background: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 12px 14px;
+  width: 100%;
+}
+.google-btn, .primary-btn, .ghost-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.google-btn { background: #fff; color: #111; }
+.primary-btn { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #fff; }
+.ghost-btn { background: #1a243d; color: #d6e3ff; }
+.primary-btn.full { width: 100%; }
+.divider { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 6px 0; }
+
+.app-shell { display: grid; grid-template-columns: 270px 1fr; min-height: 100vh; }
+.sidebar {
+  background: rgba(9, 15, 30, 0.96);
+  border-right: 1px solid var(--border);
+  padding: 26px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.brand { margin: 0; font-size: 2rem; }
+.brand-sub { margin-top: 6px; color: var(--muted); font-size: 0.9rem; }
+.nav { display: flex; flex-direction: column; gap: 8px; margin-top: 30px; }
+.nav-item {
+  color: #c8d7fb;
+  text-decoration: none;
+  padding: 12px;
+  border-radius: 10px;
+}
+.nav-item:hover { background: #13203f; }
+.nav-item.active { background: linear-gradient(90deg, #102748, #153561); color: #6fb4ff; }
+
+.main { padding: 22px; }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.topbar h2 { margin: 0; font-size: 1.8rem; }
+.topbar p { margin: 6px 0 0; color: var(--muted); }
+.topbar-actions { display: flex; gap: 10px; align-items: center; min-width: 380px; }
+
+.kpi-grid, .analysis-grid, .result-grid, .candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.analysis-grid { grid-template-columns: 1.5fr 1fr; }
+.result-grid { margin-top: 14px; grid-template-columns: repeat(2, 1fr); }
+.candidate-grid { grid-template-columns: repeat(2, 1fr); }
+
+.card {
+  background: linear-gradient(180deg, rgba(19, 30, 53, 0.82), rgba(13, 21, 40, 0.92));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+}
+.card h3 { margin-top: 0; }
+.table-card { margin-top: 14px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { border-top: 1px solid #213151; padding: 10px 8px; text-align: left; vertical-align: top; }
+.reason-cell { color: var(--muted); max-width: 560px; }
+
+.form-card { display: flex; flex-direction: column; gap: 8px; }
+.error { color: #ff7d7d; }
+
+.result-header, .candidate-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.score, .pill {
+  background: rgba(34, 125, 255, 0.2);
+  color: #7bb7ff;
+  border: 1px solid #215fb6;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .kpi-grid, .analysis-grid, .result-grid, .candidate-grid { grid-template-columns: 1fr; }
+  .login-shell { grid-template-columns: 1fr; }
+}

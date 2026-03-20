@@ -12,16 +12,12 @@ class RoleRequirementGraph(BaseModel):
 
 
 class JobIntelligenceAgent:
-    """Agent that turns a free-form JD into a structured requirement graph.
-
-    In a production system this would call an LLM (via LangGraph or similar).
-    Here we implement a deterministic heuristic so the system runs without keys.
-    """
+   
 
     def build_role_graph(self, job_id: str, title: str, description: str) -> RoleRequirementGraph:
         text = f"{title}\n{description}".lower()
 
-        # Very simple keyword buckets for demo purposes
+        
         core_keywords = [
             "python",
             "javascript",
