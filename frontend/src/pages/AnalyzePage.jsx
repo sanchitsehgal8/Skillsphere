@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import TopBar from '../components/TopBar'
 import SkillRadarChart from '../components/SkillRadarChart'
 import {
@@ -17,25 +17,37 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   const [jobDescription, setJobDescription] = useState(
     'Looking for Python, FastAPI, system design, and cloud experience. Strong ownership and communication required.',
   )
-  const [githubInput, setGithubInput] = useState('torvalds, gaearon')
-  const [codeforcesInput, setCodeforcesInput] = useState('')
+  const [candidateBoxes, setCandidateBoxes] = useState([
+    { github: 'torvalds', codeforces: '' },
+  ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState([])
 
-  const usernames = useMemo(
-    () => githubInput.split(',').map((u) => u.trim()).filter(Boolean),
-    [githubInput],
-  )
-  const cfHandles = useMemo(
-    () => codeforcesInput.split(',').map((u) => u.trim()).filter(Boolean),
-    [codeforcesInput],
-  )
+  function addCandidateBox() {
+    setCandidateBoxes((prev) => [...prev, { github: '', codeforces: '' }])
+  }
+
+  function removeCandidateBox(index) {
+    setCandidateBoxes((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateCandidateBox(index, key, value) {
+    setCandidateBoxes((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
+    )
+  }
 
   async function runAnalysis() {
     setLoading(true)
     setError('')
     try {
+      const rows = candidateBoxes
+        .map((row) => ({ github: row.github.trim(), codeforces: row.codeforces.trim() }))
+        .filter((row) => row.github)
+
+      const usernames = rows.map((r) => r.github)
+
       if (!jobTitle || !jobDescription || usernames.length === 0) {
         throw new Error('Please provide job info and at least one GitHub username.')
       }
@@ -54,7 +66,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
 
       for (let i = 0; i < usernames.length; i += 1) {
         const candidateId = usernames[i]
-        const mappedHandle = cfHandles[i] || candidateId
+        const mappedHandle = rows[i]?.codeforces || candidateId
         try {
           const cf = await getCodeforcesAnalysis(mappedHandle)
           cfByCandidate[candidateId] = cf
@@ -173,15 +185,39 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
           <label>Job Description</label>
           <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={6} />
 
-          <label>GitHub Usernames (comma separated)</label>
-          <input value={githubInput} onChange={(e) => setGithubInput(e.target.value)} />
+          <label>Candidate Inputs</label>
+          <div className="candidate-boxes">
+            {candidateBoxes.map((row, idx) => (
+              <div className="candidate-box" key={`cand-box-${idx}`}>
+                <div className="candidate-box-head">
+                  <strong>Candidate Box {idx + 1}</strong>
+                  {candidateBoxes.length > 1 && (
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => removeCandidateBox(idx)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  value={row.github}
+                  onChange={(e) => updateCandidateBox(idx, 'github', e.target.value)}
+                  placeholder="GitHub username (required)"
+                />
+                <input
+                  value={row.codeforces}
+                  onChange={(e) => updateCandidateBox(idx, 'codeforces', e.target.value)}
+                  placeholder="Codeforces handle (optional)"
+                />
+              </div>
+            ))}
+          </div>
 
-          <label>Codeforces Handles (optional, comma separated)</label>
-          <input
-            value={codeforcesInput}
-            onChange={(e) => setCodeforcesInput(e.target.value)}
-            placeholder="tourist, benq (blank = try same as GitHub usernames)"
-          />
+          <button type="button" className="ghost-btn" onClick={addCandidateBox}>
+            + Add Candidate Box
+          </button>
 
           <button className="primary-btn" onClick={runAnalysis} disabled={loading}>
             {loading ? 'Analyzing...' : 'Analyze Candidates'}
@@ -190,7 +226,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
         </section>
 
         <section className="card">
-          <h3>Scoring Rubric (Clear + Explainable)</h3>
+          <h3>Scoring Rubric </h3>
           <p className="subtle-copy">
             Final candidate score combines present skill fit and growth potential. Every factor is visible and auditable.
           </p>
