@@ -114,6 +114,50 @@ Interactive docs (Swagger UI) are at: http://127.0.0.1:8000/docs
 
 This will return a natural-language-style summary of the candidate, their Skill DNA, learning velocity, match score, and any fairness flags.
 
+## Frontend (React + Vite) – `frontend/`
+
+A full interactive recruiter UI is available and connected to the backend APIs.
+
+### Run the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open: http://127.0.0.1:5173
+
+### Required backend for frontend
+
+In another terminal:
+
+```bash
+cd backend
+source .venv311/bin/activate
+uvicorn app.main:app --reload
+```
+
+### Frontend Features
+
+- Login-style landing page
+- Dashboard with analysis KPIs and recent runs
+- Candidate list with score, direct matches, and adjacency support
+- Analyze Candidate workflow (GitHub usernames + job description)
+- Live integration with backend endpoints: `/jobs`, `/candidates`, `/match`, `/audit`, `/copilot`
+
+## Streamlit Demo Note
+
+If you use the Streamlit prototype, run:
+
+```bash
+cd backend
+source .venv311/bin/activate
+streamlit run streamlit_app.py
+```
+
+Do not run `streamlit run app.py` (that file does not exist).
+
 ## Next Steps
 
 - Swap heuristic components for real LLMs using LangGraph or similar.

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 
-export default function LoginPage() {
+export default function LoginPage({ theme, onToggleTheme }) {
   const navigate = useNavigate()
 
   return (
@@ -16,6 +16,15 @@ export default function LoginPage() {
       </section>
 
       <section className="login-right">
+        <div className="login-theme-row">
+          <button
+            className={`theme-toggle ${theme === 'dark' ? 'is-dark' : 'is-light'}`}
+            onClick={onToggleTheme}
+            aria-label="Toggle dark/light mode"
+          >
+            <span className="theme-knob">{theme === 'dark' ? '☾' : '☼'}</span>
+          </button>
+        </div>
         <h2>Welcome back</h2>
         <p>Sign in to your SkillSphere workspace</p>
         <button className="google-btn" onClick={() => navigate('/dashboard')}>Continue with Google</button>

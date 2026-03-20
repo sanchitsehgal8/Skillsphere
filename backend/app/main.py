@@ -20,7 +20,9 @@ from app.schemas.api import (
     CopilotResponse,
     AuditLogResponse,
     AuditEntryResponse,
+    CodeforcesAnalysisResponse,
 )
+from app.services.codeforces_analyzer import analyze_codeforces_handle
 
 app = FastAPI(title="SkillSphere Talent Intelligence Engine")
 
@@ -190,3 +192,12 @@ async def copilot(query: CopilotQueryRequest) -> CopilotResponse:
         logs_for_job,
     )
     return CopilotResponse(answer=answer)
+
+
+@app.get("/codeforces/{handle}/analysis", response_model=CodeforcesAnalysisResponse)
+async def codeforces_analysis(handle: str) -> CodeforcesAnalysisResponse:
+    try:
+        data = analyze_codeforces_handle(handle)
+        return CodeforcesAnalysisResponse(**data)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Codeforces analysis failed: {exc}") from exc

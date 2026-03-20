@@ -6,16 +6,18 @@ import {
   createJob,
   fetchGithubProfile,
   getAudit,
+  getCodeforcesAnalysis,
   getCopilot,
   runMatch,
 } from '../api/client'
 
-export default function AnalyzePage({ onNewAnalyses }) {
+export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   const [jobTitle, setJobTitle] = useState('Backend Engineer (Python/FastAPI)')
   const [jobDescription, setJobDescription] = useState(
     'Looking for Python, FastAPI, system design, and cloud experience. Strong ownership and communication required.',
   )
   const [githubInput, setGithubInput] = useState('torvalds, gaearon')
+  const [codeforcesInput, setCodeforcesInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState([])
@@ -23,6 +25,10 @@ export default function AnalyzePage({ onNewAnalyses }) {
   const usernames = useMemo(
     () => githubInput.split(',').map((u) => u.trim()).filter(Boolean),
     [githubInput],
+  )
+  const cfHandles = useMemo(
+    () => codeforcesInput.split(',').map((u) => u.trim()).filter(Boolean),
+    [codeforcesInput],
   )
 
   async function runAnalysis() {
@@ -37,11 +43,23 @@ export default function AnalyzePage({ onNewAnalyses }) {
       await createJob({ job_id: jobId, title: jobTitle, description: jobDescription })
 
       const prepared = []
+      const cfByCandidate = {}
       for (const username of usernames) {
         const repos = await fetchGithubProfile(username)
         const candidatePayload = buildCandidateFromGithub(username, repos)
         await createCandidate(candidatePayload)
         prepared.push({ username, ui: candidatePayload.ui })
+      }
+
+      for (let i = 0; i < usernames.length; i += 1) {
+        const candidateId = usernames[i]
+        const mappedHandle = cfHandles[i] || candidateId
+        try {
+          const cf = await getCodeforcesAnalysis(mappedHandle)
+          cfByCandidate[candidateId] = cf
+        } catch {
+          cfByCandidate[candidateId] = null
+        }
       }
 
       const matchData = await runMatch(jobId, usernames)
@@ -64,6 +82,7 @@ export default function AnalyzePage({ onNewAnalyses }) {
           copilot: copilot.answer,
           bias_flags: aud?.bias_flags || [],
           ui: uiMeta,
+          codeforces: cfByCandidate[ranked.candidate_id] || null,
         })
       }
 
@@ -76,9 +95,62 @@ export default function AnalyzePage({ onNewAnalyses }) {
     }
   }
 
+  function exportCsv() {
+    if (!results.length) return
+    const headers = [
+      'jobId',
+      'candidateId',
+      'score',
+      'time_to_productivity_days',
+      'direct_matches',
+      'adjacent_support',
+      'bias_flags',
+      'cf_rating',
+      'cf_max_rating',
+      'cf_trajectory',
+      'cf_consistency',
+      'explanation',
+    ]
+    const lines = results.map((r) => [
+      r.jobId,
+      r.candidateId,
+      r.score,
+      r.time_to_productivity_days ?? '',
+      (r.direct_matches || []).join('|'),
+      (r.adjacent_support || []).join('|'),
+      (r.bias_flags || []).join('|'),
+      r.codeforces?.stats_overview?.current_rating ?? '',
+      r.codeforces?.stats_overview?.max_rating ?? '',
+      r.codeforces?.contest_performance?.rating_trajectory ?? '',
+      r.codeforces?.contest_performance?.consistency_score ?? '',
+      (r.explanation || '').replaceAll('"', '""'),
+    ])
+
+    const csv = [
+      headers.join(','),
+      ...lines.map((row) => `${row[0]},${row[1]},${row[2]},${row[3]},${row[4]},${row[5]},${row[6]},${row[7]},${row[8]},${row[9]},${row[10]},"${row[11]}"`),
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `skillsphere-analysis-${Date.now()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="page">
-      <TopBar title="Candidate Analysis" subtitle="Impact Area 02: Potential & Learning Trajectory" />
+      <TopBar
+        title="Candidate Analysis"
+        subtitle="Impact Area 02: Potential & Learning Trajectory"
+        onExport={exportCsv}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+      />
 
       <div className="analysis-grid">
         <section className="card form-card">
@@ -91,6 +163,13 @@ export default function AnalyzePage({ onNewAnalyses }) {
 
           <label>GitHub Usernames (comma separated)</label>
           <input value={githubInput} onChange={(e) => setGithubInput(e.target.value)} />
+
+          <label>Codeforces Handles (optional, comma separated)</label>
+          <input
+            value={codeforcesInput}
+            onChange={(e) => setCodeforcesInput(e.target.value)}
+            placeholder="tourist, benq (blank = try same as GitHub usernames)"
+          />
 
           <button className="primary-btn" onClick={runAnalysis} disabled={loading}>
             {loading ? 'Analyzing...' : 'Analyze Candidates'}
@@ -121,6 +200,29 @@ export default function AnalyzePage({ onNewAnalyses }) {
             <p><strong>Direct matches:</strong> {r.direct_matches?.join(', ') || 'None'}</p>
             <p><strong>Adjacency support:</strong> {r.adjacent_support?.join('; ') || 'None'}</p>
             <p><strong>Bias flags:</strong> {r.bias_flags.length ? r.bias_flags.join('; ') : 'None'}</p>
+            {r.codeforces && (
+              <div className="cf-block">
+                <h4>Codeforces ({r.codeforces.handle})</h4>
+                <p>
+                  <strong>Rating:</strong> {r.codeforces.stats_overview.current_rating}
+                  {' '}(max {r.codeforces.stats_overview.max_rating}) — {r.codeforces.stats_overview.rank_title}
+                </p>
+                <p>
+                  <strong>Solved:</strong> {r.codeforces.stats_overview.total_problems_solved}
+                  {' '}| <strong>Submissions:</strong> {r.codeforces.stats_overview.submission_count}
+                  {' '}| <strong>AC:</strong> {r.codeforces.stats_overview.acceptance_rate}%
+                </p>
+                <p>
+                  <strong>Comfort:</strong> {r.codeforces.problem_solving_profile.comfort_zone}
+                  {' '}| <strong>Struggle:</strong> {r.codeforces.problem_solving_profile.struggle_zone}
+                </p>
+                <p>
+                  <strong>Trajectory:</strong> {r.codeforces.contest_performance.rating_trajectory}
+                  {' '}| <strong>Consistency:</strong> {r.codeforces.contest_performance.consistency_score}
+                </p>
+                <p><strong>Mentor verdict:</strong> {r.codeforces.honest_skill_verdict.mentor_summary}</p>
+              </div>
+            )}
             <details>
               <summary>Why this match?</summary>
               <p>{r.explanation}</p>

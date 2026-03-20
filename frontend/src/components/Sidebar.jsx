@@ -9,26 +9,22 @@ const navItems = [
 export default function Sidebar() {
   return (
     <aside className="sidebar">
-      <div>
+      <div className="sidebar-top">
         <h1 className="brand">SkillSphere</h1>
         <p className="brand-sub">Real signals. Better hiring.</p>
+        <nav className="nav">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
 
-      <nav className="nav">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="sidebar-foot">
-        <button className="primary-btn full">New Analysis</button>
-      </div>
     </aside>
   )
 }

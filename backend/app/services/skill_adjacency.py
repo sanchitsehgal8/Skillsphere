@@ -55,7 +55,7 @@ class SkillAdjacencyGraph:
             ("pandas", "sql"),
             ("tensorflow", "pytorch"),
             ("scikit-learn", "pytorch"),
-            ("mlops", " kubernetes"),
+            ("mlops", "kubernetes"),
             ("mlops", "airflow"),
         ]:
             self._add_edge(a, b)

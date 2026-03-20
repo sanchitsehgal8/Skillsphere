@@ -32,6 +32,11 @@ export async function getCopilot(jobId, candidateId) {
   return data
 }
 
+export async function getCodeforcesAnalysis(handle) {
+  const { data } = await api.get(`/codeforces/${encodeURIComponent(handle)}/analysis`)
+  return data
+}
+
 export async function fetchGithubProfile(username) {
   const { data } = await axios.get(`https://api.github.com/users/${username}/repos?per_page=100&sort=updated`, {
     headers: { Accept: 'application/vnd.github+json' },

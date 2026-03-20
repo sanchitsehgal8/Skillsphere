@@ -1,15 +1,48 @@
 import TopBar from '../components/TopBar'
 
-export default function DashboardPage({ analyses }) {
+export default function DashboardPage({ analyses, theme, onToggleTheme }) {
   const avgScore = analyses.length
     ? Math.round((analyses.reduce((a, c) => a + c.score, 0) / analyses.length) * 100)
     : 0
 
   const strong = analyses.filter((a) => a.score >= 0.8).length
 
+  function exportCsv() {
+    if (!analyses.length) return
+    const headers = ['jobId', 'candidateId', 'score', 'time_to_productivity_days', 'explanation']
+    const lines = analyses.map((a) => [
+      a.jobId,
+      a.candidateId,
+      a.score,
+      a.time_to_productivity_days ?? '',
+      (a.explanation || '').replaceAll('"', '""'),
+    ])
+
+    const csv = [
+      headers.join(','),
+      ...lines.map((row) => `${row[0]},${row[1]},${row[2]},${row[3]},"${row[4]}"`),
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `skillsphere-dashboard-${Date.now()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="page">
-      <TopBar title="Dashboard" subtitle="SkillSphere Precision Analytics" />
+      <TopBar
+        title="Dashboard"
+        subtitle="SkillSphere Precision Analytics"
+        onExport={exportCsv}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+      />
 
       <div className="kpi-grid">
         <div className="card"><p>Candidates Analyzed</p><h3>{analyses.length}</h3></div>
