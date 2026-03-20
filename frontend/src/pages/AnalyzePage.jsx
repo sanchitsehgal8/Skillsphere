@@ -150,6 +150,10 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     URL.revokeObjectURL(url)
   }
 
+  function listOrFallback(items, fallback) {
+    return items && items.length ? items : [fallback]
+  }
+
   return (
     <div className="page">
       <TopBar
@@ -186,13 +190,44 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
         </section>
 
         <section className="card">
-          <h3>How scoring works</h3>
-          <ul>
-            <li>Current skill fit via role-vs-skill alignment.</li>
-            <li>Learning velocity from GitHub evidence.</li>
-            <li>Skill adjacency transferability (e.g. React → Vue, C++ → Rust).</li>
-            <li>Time-to-productivity estimate with explicit reasoning.</li>
-          </ul>
+          <h3>Scoring Rubric (Clear + Explainable)</h3>
+          <p className="subtle-copy">
+            Final candidate score combines present skill fit and growth potential. Every factor is visible and auditable.
+          </p>
+
+          <div className="rubric-grid">
+            <div className="rubric-item">
+              <div className="rubric-head">
+                <strong>1) Present Skill Fit</strong>
+                <span>40%</span>
+              </div>
+              <p>How strongly the candidate’s demonstrated skills align with role requirements right now.</p>
+            </div>
+
+            <div className="rubric-item">
+              <div className="rubric-head">
+                <strong>2) Learning Velocity</strong>
+                <span>30%</span>
+              </div>
+              <p>How fast the candidate appears to learn from evidence (repo quality, activity, and skill breadth).</p>
+            </div>
+
+            <div className="rubric-item">
+              <div className="rubric-head">
+                <strong>3) Productivity Readiness (TTP)</strong>
+                <span>30%</span>
+              </div>
+              <p>Estimated focused effort before independent output, expressed in pomodoros, hours, and sprint fraction.</p>
+            </div>
+          </div>
+
+          <div className="rubric-bands">
+            <h4>Decision Bands</h4>
+            <p><strong>80–100:</strong> Strong match — ready to interview now.</p>
+            <p><strong>65–79:</strong> Promising — good fit with manageable ramp-up.</p>
+            <p><strong>50–64:</strong> Potential bet — requires guided onboarding.</p>
+            <p><strong>&lt;50:</strong> Low fit for current role scope.</p>
+          </div>
         </section>
       </div>
 
@@ -203,51 +238,71 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
               <h3>{r.candidateId}</h3>
               <span className="score">{Math.round(r.score * 100)}%</span>
             </div>
-            <p>
-              <strong>Estimated TTP:</strong>{' '}
-              {r.time_to_productivity_pomodoros?.toFixed(1)} pomodoros
-              {' '}({r.time_to_productivity_hours?.toFixed(1)}h, ~{r.time_to_productivity_sprints?.toFixed(2)} sprints)
-            </p>
-            {r.time_to_productivity_explanation && (
-              <p><strong>What this means:</strong> {r.time_to_productivity_explanation}</p>
-            )}
-            <p><strong>Repos:</strong> {r.ui?.repos ?? '-'} | <strong>Stars:</strong> {r.ui?.stars ?? '-'}</p>
-            <p><strong>Direct matches:</strong> {r.direct_matches?.join(', ') || 'None'}</p>
-            <p><strong>Adjacency support:</strong> {r.adjacent_support?.join('; ') || 'None'}</p>
-            <p><strong>Bias flags:</strong> {r.bias_flags.length ? r.bias_flags.join('; ') : 'None'}</p>
+
+            <div className="result-section">
+              <h4>Productivity Snapshot</h4>
+              <div className="metric-grid">
+                <div className="metric-item">
+                  <span className="k">Estimated TTP</span>
+                  <strong>
+                    {r.time_to_productivity_pomodoros?.toFixed(1)} pomodoros
+                    {' '}({r.time_to_productivity_hours?.toFixed(1)}h)
+                  </strong>
+                </div>
+                <div className="metric-item">
+                  <span className="k">Sprint Equivalent</span>
+                  <strong>~{r.time_to_productivity_sprints?.toFixed(2)} sprints</strong>
+                </div>
+                <div className="metric-item">
+                  <span className="k">GitHub Evidence</span>
+                  <strong>{r.ui?.repos ?? '-'} repos | {r.ui?.stars ?? '-'} stars</strong>
+                </div>
+                <div className="metric-item">
+                  <span className="k">Bias Check</span>
+                  <strong>{r.bias_flags.length ? 'Flags present' : 'No flags'}</strong>
+                </div>
+              </div>
+              {r.time_to_productivity_explanation && <p className="subtle-copy">{r.time_to_productivity_explanation}</p>}
+            </div>
+
+            <div className="result-section">
+              <h4>Role Fit Breakdown</h4>
+              <div className="tag-list">
+                {listOrFallback(r.direct_matches, 'No direct matches').map((t) => (
+                  <span className="tag-chip" key={`d-${t}`}>{t}</span>
+                ))}
+              </div>
+              <p className="subtle-copy"><strong>Direct fit:</strong> Skills already demonstrated for this role.</p>
+              <div className="tag-list">
+                {listOrFallback(r.adjacent_support, 'No adjacent transfer paths found').map((t) => (
+                  <span className="tag-chip alt" key={`a-${t}`}>{t}</span>
+                ))}
+              </div>
+              <p className="subtle-copy"><strong>Adjacency potential:</strong> Skills that can transfer quickly to missing requirements.</p>
+            </div>
+
             {r.codeforces && (
-              <div className="cf-block">
-                <h4>Codeforces ({r.codeforces.handle})</h4>
-                <p>
-                  <strong>Rating:</strong> {r.codeforces.stats_overview.current_rating}
-                  {' '}(max {r.codeforces.stats_overview.max_rating}) — {r.codeforces.stats_overview.rank_title}
-                </p>
-                <p>
-                  <strong>Solved:</strong> {r.codeforces.stats_overview.total_problems_solved}
-                  {' '}| <strong>Submissions:</strong> {r.codeforces.stats_overview.submission_count}
-                  {' '}| <strong>AC:</strong> {r.codeforces.stats_overview.acceptance_rate}%
-                </p>
-                <p>
-                  <strong>Comfort:</strong> {r.codeforces.problem_solving_profile.comfort_zone}
-                  {' '}| <strong>Struggle:</strong> {r.codeforces.problem_solving_profile.struggle_zone}
-                </p>
-                <p>
-                  <strong>Trajectory:</strong> {r.codeforces.contest_performance.rating_trajectory}
-                  {' '}| <strong>Consistency:</strong> {r.codeforces.contest_performance.consistency_score}
-                </p>
-                <p><strong>Mentor verdict:</strong> {r.codeforces.honest_skill_verdict.mentor_summary}</p>
+              <div className="result-section cf-block">
+                <h4>Codeforces Benchmark ({r.codeforces.handle})</h4>
+                <div className="metric-grid">
+                  <div className="metric-item"><span className="k">Rating</span><strong>{r.codeforces.stats_overview.current_rating} (max {r.codeforces.stats_overview.max_rating})</strong></div>
+                  <div className="metric-item"><span className="k">Rank</span><strong>{r.codeforces.stats_overview.rank_title}</strong></div>
+                  <div className="metric-item"><span className="k">Solved / AC</span><strong>{r.codeforces.stats_overview.total_problems_solved} / {r.codeforces.stats_overview.acceptance_rate}%</strong></div>
+                  <div className="metric-item"><span className="k">Trajectory</span><strong>{r.codeforces.contest_performance.rating_trajectory}</strong></div>
+                </div>
+                <p className="subtle-copy"><strong>Mentor verdict:</strong> {r.codeforces.honest_skill_verdict.mentor_summary}</p>
               </div>
             )}
 
-            <div className="cf-block">
+            <div className="result-section cf-block">
               <h4>Candidate Skill Graph</h4>
               <SkillRadarChart candidate={r} />
-              <p><strong>Adjacency map:</strong> {r.adjacent_support?.join('; ') || 'No adjacent transfer paths found for this role.'}</p>
+              <p className="subtle-copy"><strong>Adjacency map:</strong> {r.adjacent_support?.join('; ') || 'No adjacent transfer paths found for this role.'}</p>
             </div>
             <details>
-              <summary>Why this match?</summary>
-              <p>{r.explanation}</p>
-              <p>{r.copilot}</p>
+              <summary>Why this match? (Full explanation)</summary>
+              <p className="subtle-copy">{r.explanation}</p>
+              <p className="subtle-copy">{r.copilot}</p>
             </details>
           </article>
         ))}

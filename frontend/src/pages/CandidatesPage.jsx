@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import TopBar from '../components/TopBar'
+import SkillRadarChart from '../components/SkillRadarChart'
 
 export default function CandidatesPage({ analysesByCandidate, theme, onToggleTheme }) {
   const items = Object.values(analysesByCandidate)
@@ -116,6 +117,7 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
               <h3>{item.candidateId}</h3>
               <span className="pill">{Math.round(item.score * 100)}%</span>
             </div>
+            <SkillRadarChart candidate={item} />
             <p>
               <strong>TTP:</strong>{' '}
               {item.time_to_productivity_pomodoros
