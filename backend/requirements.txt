@@ -3,3 +3,4 @@ uvicorn[standard]==0.30.0
 pydantic==2.7.0
 streamlit==1.41.0
 requests==2.32.3
+transformers==4.46.3
