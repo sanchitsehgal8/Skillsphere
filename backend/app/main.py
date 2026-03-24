@@ -25,7 +25,6 @@ from app.schemas.api import (
 from app.services.codeforces_analyzer import analyze_codeforces_handle
 
 app = FastAPI(title="SkillSphere Talent Intelligence Engine")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -57,6 +56,7 @@ async def create_job(req: CreateJobRequest) -> JobDescription:
     graph = _job_agent.build_role_graph(job_id=req.job_id, title=req.title, description=req.description)
     _JOBS[req.job_id] = graph
     return graph.job
+
 
 
 @app.get("/jobs/{job_id}", response_model=JobDescription)

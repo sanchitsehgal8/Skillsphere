@@ -18,7 +18,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     'Looking for Python, FastAPI, system design, and cloud experience. Strong ownership and communication required.',
   )
   const [candidateBoxes, setCandidateBoxes] = useState([
-    { github: 'torvalds', codeforces: '' },
+    { github: 'sanchitsehgal8', codeforces: '' },
   ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -184,6 +184,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
 
           <label>Job Description</label>
           <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={6} />
+        
 
           <label>Candidate Inputs</label>
           <div className="candidate-boxes">
