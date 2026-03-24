@@ -12,6 +12,17 @@ export async function createJob(job) {
   return data
 }
 
+export async function extractJdFromPdf(file) {
+  const form = new FormData()
+  form.append('file', file)
+
+  const { data } = await api.post('/jobs/extract-jd-pdf', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  })
+  return data
+}
+
 export async function createCandidate(candidate) {
   const { data } = await api.post('/candidates', candidate)
   return data

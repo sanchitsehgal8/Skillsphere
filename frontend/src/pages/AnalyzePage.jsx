@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import TopBar from '../components/TopBar'
 import SkillRadarChart from '../components/SkillRadarChart'
 import {
   buildCandidateFromGithub,
   createCandidate,
   createJob,
+  extractJdFromPdf,
   fetchGithubProfile,
   getAudit,
   getCodeforcesAnalysis,
@@ -21,8 +22,32 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     { github: 'sanchitsehgal8', codeforces: '' },
   ])
   const [loading, setLoading] = useState(false)
+  const [jdUploading, setJdUploading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState([])
+  const jdPdfInputRef = useRef(null)
+
+  async function handleJdPdfUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setError('')
+    setJdUploading(true)
+    try {
+      const parsed = await extractJdFromPdf(file)
+      if (parsed?.extracted_text) {
+        setJobDescription(parsed.extracted_text)
+      }
+      if (!jobTitle?.trim() && parsed?.suggested_title) {
+        setJobTitle(parsed.suggested_title)
+      }
+    } catch (eUpload) {
+      setError(eUpload?.response?.data?.detail || 'Failed to extract text from JD PDF')
+    } finally {
+      setJdUploading(false)
+      e.target.value = ''
+    }
+  }
 
   function addCandidateBox() {
     setCandidateBoxes((prev) => [...prev, { github: '', codeforces: '' }])
@@ -184,7 +209,24 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
 
           <label>Job Description</label>
           <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={6} />
-        
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 12 }}>
+            <input
+              ref={jdPdfInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={handleJdPdfUpload}
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => jdPdfInputRef.current?.click()}
+              disabled={jdUploading}
+            >
+              {jdUploading ? 'Uploading JD PDF...' : 'Add PDF'}
+            </button>
+          </div>
 
           <label>Candidate Inputs</label>
           <div className="candidate-boxes">

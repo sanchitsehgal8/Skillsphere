@@ -11,6 +11,11 @@ class CreateJobRequest(BaseModel):
     description: str
 
 
+class ExtractJobDescriptionResponse(BaseModel):
+    extracted_text: str
+    suggested_title: Optional[str] = None
+
+
 class CreateCandidateRequest(BaseModel):
     candidate_id: str
     name: str

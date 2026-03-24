@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.job_intelligence import JobIntelligenceAgent, RoleRequirementGraph
@@ -12,6 +12,7 @@ from app.agents.recruiter_copilot import RecruiterCopilotAgent
 from app.models import CandidateProfile, JobDescription, SkillGraph
 from app.schemas.api import (
     CreateJobRequest,
+    ExtractJobDescriptionResponse,
     CreateCandidateRequest,
     RunMatchingRequest,
     RunMatchingResponse,
@@ -23,6 +24,7 @@ from app.schemas.api import (
     CodeforcesAnalysisResponse,
 )
 from app.services.codeforces_analyzer import analyze_codeforces_handle
+from app.services.jd_parser import extract_text_from_pdf_bytes, suggest_title_from_jd
 
 app = FastAPI(title="SkillSphere Talent Intelligence Engine")
 app.add_middleware(
@@ -56,6 +58,30 @@ async def create_job(req: CreateJobRequest) -> JobDescription:
     graph = _job_agent.build_role_graph(job_id=req.job_id, title=req.title, description=req.description)
     _JOBS[req.job_id] = graph
     return graph.job
+
+
+@app.post("/jobs/extract-jd-pdf", response_model=ExtractJobDescriptionResponse)
+async def extract_jd_pdf(file: UploadFile = File(...)) -> ExtractJobDescriptionResponse:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Please upload a PDF file.")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded PDF is empty.")
+
+    try:
+        extracted = extract_text_from_pdf_bytes(raw)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}") from exc
+
+    if not extracted:
+        raise HTTPException(status_code=400, detail="Could not extract readable text from this PDF.")
+
+    return ExtractJobDescriptionResponse(
+        extracted_text=extracted,
+        suggested_title=suggest_title_from_jd(extracted),
+    )
 
 
 
