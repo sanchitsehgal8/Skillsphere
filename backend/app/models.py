@@ -25,7 +25,7 @@ class JobDescription(BaseModel):
 
 
 class PlatformSignal(BaseModel):
-    platform: str  # e.g. github, leetcode, linkedin, kaggle, portfolio
+    platform: str  # e.g. github, leetcode, codeforces_profile, kaggle, portfolio
     url: Optional[str] = None
     metadata: Dict[str, str] = {}
 

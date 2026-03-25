@@ -137,7 +137,6 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   }
 
   function exportCsv() {
-    if (!results.length) return
     const headers = [
       'jobId',
       'candidateId',
@@ -154,7 +153,25 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
       'cf_consistency',
       'explanation',
     ]
-    const lines = results.map((r) => [
+    const source = results.length
+      ? results
+      : [
+          {
+            jobId: 'n/a',
+            candidateId: 'n/a',
+            score: 0,
+            time_to_productivity_pomodoros: '',
+            time_to_productivity_hours: '',
+            time_to_productivity_sprints: '',
+            direct_matches: ['Run analysis to generate results'],
+            adjacent_support: [],
+            bias_flags: [],
+            codeforces: null,
+            explanation: 'No analysis results available yet.',
+          },
+        ]
+
+    const lines = source.map((r) => [
       r.jobId,
       r.candidateId,
       r.score,
@@ -192,129 +209,148 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   }
 
   return (
-    <div className="page">
+    <div className="page analyze-page">
       <TopBar
-        title="Candidate Analysis"
-        subtitle="Impact Area 02: Potential & Learning Trajectory"
+        title="Analyze Candidate"
+        subtitle="Run deep AI fit analysis for new talent against your open roles."
         onExport={exportCsv}
         theme={theme}
         onToggleTheme={onToggleTheme}
       />
 
       <div className="analysis-grid">
-        <section className="card form-card">
-          <h3>Run New Analysis</h3>
-          <label>Job Title</label>
-          <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+        <div className="analyze-main-col">
+          <section className="card form-card analyze-block">
+            <div className="card-section-head">
+              <h3>Job Context</h3>
+              <div className="jd-actions">
+                <input
+                  ref={jdPdfInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={handleJdPdfUpload}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={() => jdPdfInputRef.current?.click()}
+                  disabled={jdUploading}
+                >
+                  {jdUploading ? 'Uploading PDF...' : 'Add PDF to Auto-fill'}
+                </button>
+              </div>
+            </div>
 
-          <label>Job Description</label>
-          <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={6} />
+            <label className="field-label">Job Title</label>
+            <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 12 }}>
-            <input
-              ref={jdPdfInputRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              onChange={handleJdPdfUpload}
-              style={{ display: 'none' }}
+            <label className="field-label">Job Description</label>
+            <textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              rows={7}
+              placeholder="Paste the detailed job requirements and ideal candidate profile here..."
             />
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => jdPdfInputRef.current?.click()}
-              disabled={jdUploading}
-            >
-              {jdUploading ? 'Uploading JD PDF...' : 'Add PDF'}
-            </button>
-          </div>
+          </section>
 
-          <label>Candidate Inputs</label>
-          <div className="candidate-boxes">
-            {candidateBoxes.map((row, idx) => (
-              <div className="candidate-box" key={`cand-box-${idx}`}>
-                <div className="candidate-box-head">
-                  <strong>Candidate Box {idx + 1}</strong>
+          <section className="card form-card analyze-block">
+            <div className="card-section-head">
+              <h3>Candidate Handles</h3>
+            </div>
+
+            <div className="candidate-boxes">
+              {candidateBoxes.map((row, idx) => (
+                <div className="candidate-box" key={`cand-box-${idx}`}>
+                  <div className="candidate-inline-inputs">
+                    <input
+                      value={row.codeforces}
+                      onChange={(e) => updateCandidateBox(idx, 'codeforces', e.target.value)}
+                      placeholder="Codeforces Profile URL (optional)"
+                    />
+                    <input
+                      value={row.github}
+                      onChange={(e) => updateCandidateBox(idx, 'github', e.target.value)}
+                      placeholder="GitHub Username (required)"
+                    />
+                  </div>
                   {candidateBoxes.length > 1 && (
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => removeCandidateBox(idx)}
-                    >
-                      Remove
-                    </button>
+                    <div className="candidate-box-head">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => removeCandidateBox(idx)}
+                      >
+                        Remove Candidate
+                      </button>
+                    </div>
                   )}
                 </div>
-                <input
-                  value={row.github}
-                  onChange={(e) => updateCandidateBox(idx, 'github', e.target.value)}
-                  placeholder="GitHub username (required)"
-                />
-                <input
-                  value={row.codeforces}
-                  onChange={(e) => updateCandidateBox(idx, 'codeforces', e.target.value)}
-                  placeholder="Codeforces handle (optional)"
-                />
-              </div>
-            ))}
-          </div>
-
-          <button type="button" className="ghost-btn" onClick={addCandidateBox}>
-            + Add Candidate Box
-          </button>
-
-          <button className="primary-btn" onClick={runAnalysis} disabled={loading}>
-            {loading ? 'Analyzing...' : 'Analyze Candidates'}
-          </button>
-          {error && <p className="error">{error}</p>}
-        </section>
-
-        <section className="card">
-          <h3>Scoring Rubric </h3>
-          <p className="subtle-copy">
-            Final candidate score combines present skill fit and growth potential. Every factor is visible and auditable.
-          </p>
-
-          <div className="rubric-grid">
-            <div className="rubric-item">
-              <div className="rubric-head">
-                <strong>1) Present Skill Fit</strong>
-                <span>40%</span>
-              </div>
-              <p>How strongly the candidate’s demonstrated skills align with role requirements right now.</p>
+              ))}
             </div>
 
-            <div className="rubric-item">
-              <div className="rubric-head">
-                <strong>2) Learning Velocity</strong>
-                <span>30%</span>
-              </div>
-              <p>How fast the candidate appears to learn from evidence (repo quality, activity, and skill breadth).</p>
+            <button type="button" className="ghost-btn dashed" onClick={addCandidateBox}>
+              + Add Another Candidate
+            </button>
+
+            <button className="primary-btn analyze-run-btn" onClick={runAnalysis} disabled={loading}>
+              {loading ? 'Analyzing...' : 'Analyze Candidate'}
+            </button>
+            {error && <p className="error">{error}</p>}
+          </section>
+        </div>
+
+        <aside className="analyze-side-col">
+          <section className="card rubric-card analyze-side-card">
+            <div className="card-section-head">
+              <h3>AI Scoring Rubric</h3>
             </div>
 
-            <div className="rubric-item">
-              <div className="rubric-head">
-                <strong>3) Productivity Readiness (TTP)</strong>
-                <span>30%</span>
+            <div className="rubric-grid">
+              <div className="rubric-item">
+                <div className="rubric-head">
+                  <strong>Present Skill Fit</strong>
+                  <span>40%</span>
+                </div>
+                <p>Direct correlation between current stack expertise and the job's core technical requirements.</p>
               </div>
-              <p>Estimated focused effort before independent output, expressed in pomodoros, hours, and sprint fraction.</p>
-            </div>
-          </div>
 
-          <div className="rubric-bands">
-            <h4>Decision Bands</h4>
-            <p><strong>80–100:</strong> Strong match — ready to interview now.</p>
-            <p><strong>65–79:</strong> Promising — good fit with manageable ramp-up.</p>
-            <p><strong>50–64:</strong> Potential bet — requires guided onboarding.</p>
-            <p><strong>&lt;50:</strong> Low fit for current role scope.</p>
-          </div>
-        </section>
+              <div className="rubric-item">
+                <div className="rubric-head">
+                  <strong>Learning Velocity</strong>
+                  <span>30%</span>
+                </div>
+                <p>Predicted speed of adapting to internal tools and new architectural patterns based on past trajectory.</p>
+              </div>
+
+              <div className="rubric-item">
+                <div className="rubric-head">
+                  <strong>Productivity Readiness</strong>
+                  <span>30%</span>
+                </div>
+                <p>Assessment of soft skills, project management approach, and collaborative history.</p>
+              </div>
+            </div>
+
+            <div className="rubric-bands decision-card">
+              <div className="status-pill">System live</div>
+              <h4>Decision Bands</h4>
+              <p><strong>80 - 100:</strong> Strong Match</p>
+              <p><strong>65 - 79:</strong> Promising</p>
+              <p><strong>Below 65:</strong> Out of Scope</p>
+            </div>
+          </section>
+        </aside>
       </div>
 
       <div className="result-grid">
         {results.map((r) => (
           <article className="card result-card" key={r.candidateId}>
             <div className="result-header">
-              <h3>{r.candidateId}</h3>
+              <div>
+                <h3>{r.candidateId}</h3>
+                <p className="subtle-copy">Evidence-based summary</p>
+              </div>
               <span className="score">{Math.round(r.score * 100)}%</span>
             </div>
 

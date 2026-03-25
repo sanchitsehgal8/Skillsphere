@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import CandidatesPage from './pages/CandidatesPage'
 import AnalyzePage from './pages/AnalyzePage'
+import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
 
 function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
   const analysesByCandidate = useMemo(() => {
@@ -24,7 +26,7 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar onLogout={() => setAnalyses([])} />
       <main className="main">
         <Routes>
           <Route
@@ -38,6 +40,14 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
           <Route
             path="/analyze"
             element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
+          />
+          <Route
+            path="/settings"
+            element={<SettingsPage theme={theme} onToggleTheme={onToggleTheme} />}
+          />
+          <Route
+            path="/profile"
+            element={<ProfilePage theme={theme} onToggleTheme={onToggleTheme} />}
           />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

@@ -5,7 +5,7 @@
 SkillSphere is an agentic, AI-powered talent intelligence engine that thinks like your best recruiter. Instead of blindly keyword-matching resumes, it uses specialised AI agents to:
 
 - Understand job descriptions as structured requirement graphs.
-- Scout public signals across platforms (GitHub, LeetCode, LinkedIn, Kaggle, portfolios).
+- Scout public signals across platforms (GitHub, LeetCode, Codeforces profile, Kaggle, portfolios).
 - Build a Skill DNA graph per candidate and estimate learning velocity.
 - Rank candidates by a mix of present fit and growth potential.
 - Run a fairness pass to surface potential demographic bias.
@@ -78,7 +78,7 @@ Interactive docs (Swagger UI) are at: http://127.0.0.1:8000/docs
 			 "platforms": [
 				 {"platform": "github", "metadata": {"top_repo": "llm-routing-service"}},
 				 {"platform": "leetcode", "metadata": {"rating": "advanced"}},
-				 {"platform": "linkedin", "metadata": {}}
+				 {"platform": "codeforces_profile", "metadata": {}}
 			 ],
 			 "demographics": {"gender": "female"}
 		 }'
@@ -161,6 +161,6 @@ Do not run `streamlit run app.py` (that file does not exist).
 ## Next Steps
 
 - Swap heuristic components for real LLMs using LangGraph or similar.
-- Plug in actual platform APIs (GitHub, LeetCode, LinkedIn, Kaggle, portfolios).
+- Plug in actual platform APIs (GitHub, LeetCode, Codeforces profile, Kaggle, portfolios).
 - Replace in-memory stores with a database and vector store (e.g., FAISS).
 - Extend the fairness and DEI auditing layer with more robust metrics.

@@ -4,11 +4,6 @@ from app.models import BiasFlag, AuditLogEntry, CandidateProfile, MatchScore
 
 
 class TransformerBiasDetector:
-    """Transformer-backed bias detector using zero-shot classification.
-
-    - Primary model: facebook/bart-large-mnli
-    - If transformers/runtime is unavailable, detector degrades gracefully.
-    """
 
     def __init__(self, model_name: str = "facebook/bart-large-mnli") -> None:
         self.model_name = model_name

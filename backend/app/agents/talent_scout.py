@@ -81,8 +81,8 @@ class TalentScoutAgent:
             if p.platform.lower() in {"leetcode", "codeforces"}:
                 rating = p.metadata.get("rating", "intermediate")
                 problem_solving_bits.append(f"Competitive programming level: {rating}.")
-            if p.platform.lower() == "linkedin":
-                activity_descriptions.append("Professional profile with endorsements.")
+            if p.platform.lower() == "codeforces_profile":
+                activity_descriptions.append("Codeforces profile with competitive programming evidence.")
             if p.platform.lower() in {"kaggle", "portfolio"}:
                 activity_descriptions.append("Has public projects showcasing practical skills.")
 
