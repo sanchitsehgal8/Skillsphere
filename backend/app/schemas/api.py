@@ -5,6 +5,23 @@ from pydantic import BaseModel
 from app.models import PlatformSignal, ExperienceLevel
 
 
+class XAIComponentResponse(BaseModel):
+    name: str
+    metric_value: float
+    weight: float
+    contribution: float
+    reason: str
+
+
+class XAIExplanationResponse(BaseModel):
+    summary: str
+    confidence: float
+    score_components: List[XAIComponentResponse] = []
+    strengths: List[str] = []
+    gaps: List[str] = []
+    recommendations: List[str] = []
+
+
 class CreateJobRequest(BaseModel):
     job_id: str
     title: str
@@ -14,6 +31,12 @@ class CreateJobRequest(BaseModel):
 class ExtractJobDescriptionResponse(BaseModel):
     extracted_text: str
     suggested_title: Optional[str] = None
+
+
+class ExtractResumeResponse(BaseModel):
+    extracted_text: str
+    inferred_skills: List[str] = []
+    estimated_years_experience: Optional[float] = None
 
 
 class CreateCandidateRequest(BaseModel):
@@ -49,6 +72,7 @@ class RankedCandidate(BaseModel):
     time_to_productivity_explanation: str | None = None
     direct_matches: List[str] = []
     adjacent_support: List[str] = []
+    xai: XAIExplanationResponse | None = None
 
 
 class RunMatchingResponse(BaseModel):

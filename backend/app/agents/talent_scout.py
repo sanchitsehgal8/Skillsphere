@@ -11,6 +11,9 @@ class TalentSignals(BaseModel):
     activity_summary: str
     repositories: List[str]
     problem_solving_summary: str
+    resume_text: str = ""
+    resume_skills: List[str] = []
+    years_experience: float | None = None
     language_profile: Dict[str, int] = {}
     total_repos: int = 0
     total_stars: int = 0
@@ -23,6 +26,9 @@ class TalentScoutAgent:
         problem_solving_bits: List[str] = []
         activity_descriptions: List[str] = []
         language_profile: Dict[str, int] = {}
+        resume_text = ""
+        resume_skills: List[str] = []
+        years_experience: float | None = None
 
         total_repos = 0
         total_stars = 0
@@ -85,6 +91,29 @@ class TalentScoutAgent:
                 activity_descriptions.append("Codeforces profile with competitive programming evidence.")
             if p.platform.lower() in {"kaggle", "portfolio"}:
                 activity_descriptions.append("Has public projects showcasing practical skills.")
+            if p.platform.lower() == "resume":
+                resume_text = p.metadata.get("resume_text", "")
+
+                raw_skills = p.metadata.get("inferred_skills", "")
+                parsed_skills = [s.strip().lower() for s in raw_skills.split(",") if s.strip()]
+                if parsed_skills:
+                    resume_skills = sorted(set(parsed_skills))
+
+                raw_years = p.metadata.get("years_experience", "")
+                if raw_years:
+                    try:
+                        yoe = float(raw_years)
+                        if 0.0 <= yoe <= 40.0:
+                            years_experience = yoe
+                    except (TypeError, ValueError):
+                        years_experience = None
+
+                if resume_skills:
+                    activity_descriptions.append(
+                        "Resume evidence includes: " + ", ".join(resume_skills[:8]) + ".",
+                    )
+                else:
+                    activity_descriptions.append("Resume evidence provided.")
 
         if not activity_descriptions:
             activity_descriptions.append("Limited public signal; relying on resume summary.")
@@ -105,6 +134,9 @@ class TalentScoutAgent:
             activity_summary=activity_summary,
             repositories=repos,
             problem_solving_summary=problem_summary,
+            resume_text=resume_text,
+            resume_skills=resume_skills,
+            years_experience=years_experience,
             language_profile=language_profile,
             total_repos=total_repos,
             total_stars=total_stars,

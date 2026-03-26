@@ -15,11 +15,30 @@ class SkillAdjacencyGraph:
     def __init__(self) -> None:
         # Undirected adjacency list; edges imply strong transferability.
         self._adj: Dict[str, set[str]] = {}
+        self._aliases: Dict[str, str] = {
+            "ts": "typescript",
+            "js": "javascript",
+            "nodejs": "javascript",
+            "node.js": "javascript",
+            "nextjs": "next.js",
+            "ml": "machine learning",
+            "deep learning": "machine learning",
+            "llm": "machine learning",
+            "algorithmic thinking": "algorithms",
+            "problem solving": "algorithms",
+            "data engineer": "data engineering",
+        }
         self._build_default_graph()
 
+    def _canon(self, skill: str) -> str:
+        s = (skill or "").lower().strip()
+        if not s:
+            return s
+        return self._aliases.get(s, s)
+
     def _add_edge(self, a: str, b: str) -> None:
-        a = a.lower()
-        b = b.lower()
+        a = self._canon(a)
+        b = self._canon(b)
         if a == b:
             return
         self._adj.setdefault(a, set()).add(b)
@@ -45,6 +64,9 @@ class SkillAdjacencyGraph:
             ("vue", "nuxt"),
             ("django", "flask"),
             ("fastapi", "django"),
+            ("python", "fastapi"),
+            ("python", "django"),
+            ("python", "flask"),
             ("express", "fastify"),
         ]:
             self._add_edge(a, b)
@@ -55,8 +77,14 @@ class SkillAdjacencyGraph:
             ("pandas", "sql"),
             ("tensorflow", "pytorch"),
             ("scikit-learn", "pytorch"),
+            ("machine learning", "pytorch"),
+            ("machine learning", "tensorflow"),
+            ("machine learning", "scikit-learn"),
+            ("machine learning", "llm"),
             ("mlops", "kubernetes"),
             ("mlops", "airflow"),
+            ("data engineering", "sql"),
+            ("data engineering", "airflow"),
         ]:
             self._add_edge(a, b)
 
@@ -71,12 +99,21 @@ class SkillAdjacencyGraph:
         # General CS
         for a, b in [
             ("algorithms", "data structures"),
+            ("algorithms", "software engineering"),
             ("system design", "distributed systems"),
+            ("software engineering", "system design"),
+            ("software engineering", "python"),
+            ("software engineering", "javascript"),
+            ("communication", "collaboration"),
+            ("communication", "leadership"),
+            ("leadership", "mentorship"),
+            ("ownership", "leadership"),
+            ("ownership", "collaboration"),
         ]:
             self._add_edge(a, b)
 
     def neighbours(self, skill: str) -> Iterable[str]:
-        return self._adj.get(skill.lower(), set())
+        return self._adj.get(self._canon(skill), set())
 
     def shortest_distance(self, source: str, target: str, max_depth: int = 3) -> Optional[int]:
         """Return the hop distance between two skills if they are connected.
@@ -85,12 +122,19 @@ class SkillAdjacencyGraph:
         Returns 0 if the names are identical, None if no path within max_depth.
         """
 
-        s = source.lower().strip()
-        t = target.lower().strip()
+        s = self._canon(source)
+        t = self._canon(target)
         if not s or not t:
             return None
         if s == t:
             return 0
+
+        # lexical fallback: if tokens overlap strongly, treat as near-adjacent
+        # (helps with variants like "data engineering" vs "data engineer").
+        s_tokens = {tok for tok in s.replace(".", " ").replace("-", " ").split() if tok}
+        t_tokens = {tok for tok in t.replace(".", " ").replace("-", " ").split() if tok}
+        if s_tokens and t_tokens and len(s_tokens & t_tokens) >= 1:
+            return 2
 
         visited = {s}
         q: deque[tuple[str, int]] = deque([(s, 0)])

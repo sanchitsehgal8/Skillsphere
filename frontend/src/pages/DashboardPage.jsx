@@ -7,6 +7,31 @@ export default function DashboardPage({ analyses, theme, onToggleTheme }) {
   const [showStrongOnly, setShowStrongOnly] = useState(false)
   const [page, setPage] = useState(1)
 
+  function getScoreBand(score) {
+    if (score >= 0.8) return 'Strong match'
+    if (score >= 0.65) return 'Promising match'
+    return 'Developing match'
+  }
+
+  function buildReasonOneLiner(a) {
+    const band = getScoreBand(a.score)
+    const direct = (a.direct_matches || []).slice(0, 2).join(', ')
+    const hasAdj = !!(a.adjacent_support && a.adjacent_support.length)
+    const ttp = a.time_to_productivity_hours ? `~${a.time_to_productivity_hours.toFixed(1)}h to productivity` : null
+
+    const pieces = [band]
+    if (direct) {
+      pieces.push(`direct fit: ${direct}`)
+    } else if (hasAdj) {
+      pieces.push('adjacent skills can transfer quickly')
+    } else {
+      pieces.push('needs focused onboarding for role-specific gaps')
+    }
+    if (ttp) pieces.push(ttp)
+
+    return pieces.join(' • ')
+  }
+
   const avgScore = analyses.length
     ? Math.round((analyses.reduce((a, c) => a + c.score, 0) / analyses.length) * 100)
     : 0
@@ -61,7 +86,7 @@ export default function DashboardPage({ analyses, theme, onToggleTheme }) {
       role: (a.direct_matches && a.direct_matches[0]) || 'Candidate profile',
       score: a.score,
       ttp: a.time_to_productivity_hours ? `~${a.time_to_productivity_hours.toFixed(1)}h` : 'Pending',
-      reason: a.explanation,
+      reason: buildReasonOneLiner(a),
       initials: a.candidateId.slice(0, 2).toUpperCase(),
       tone: i % 3 === 0 ? 'orange' : i % 3 === 1 ? 'blue' : 'gold',
     }))

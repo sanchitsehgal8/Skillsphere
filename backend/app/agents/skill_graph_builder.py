@@ -59,6 +59,27 @@ class SkillGraphBuilderAgent:
                     f"{total_repos} total repos, {total_stars} total stars).",
                 )
 
+        # Resume adds structured signals beyond public repositories.
+        resume_skill_set = {s.lower() for s in (signals.resume_skills or [])}
+        for resume_skill in sorted(resume_skill_set):
+            # Resume-only skill claims start with moderate confidence.
+            # If the same skill appears in GitHub signals, confidence is higher.
+            existing = next((s for s in skills if s.name.lower() == resume_skill), None)
+            if existing:
+                existing.score = max(existing.score, min(1.0, existing.score + 0.1))
+                existing.evidence.append("Also validated by resume evidence.")
+                continue
+
+            base_resume_score = 0.62
+            if resume_skill in {"python", "fastapi", "react", "typescript", "javascript"}:
+                base_resume_score = 0.68
+
+            add_skill(
+                resume_skill,
+                base_resume_score,
+                "Inferred from uploaded resume.",
+            )
+
         if not skills:
             add_skill(
                 "general problem solving",
@@ -66,20 +87,45 @@ class SkillGraphBuilderAgent:
                 "Limited public signal; inferred from profile.",
             )
 
-        # Learning velocity heuristic: more diverse signals => higher velocity
+        # Learning velocity calibration:
+        # - deterministic for the same inputs
+        # - avoids extreme jumps when optional resume data is missing
+        # - remains bounded to realistic range for UI and ranking stability
         diversity = len({s.name for s in skills})
-        base_velocity = 0.4 + 0.1 * min(diversity, 4)
 
-        # Increase learning velocity for higher GitHub activity levels.
         import math
 
-        base_velocity += 0.08 * (math.log1p(max(signals.total_repos, 0)) / 5.0)
-        base_velocity += 0.07 * (math.log1p(max(signals.total_stars, 0)) / 8.0)
+        diversity_norm = min(diversity, 8) / 8.0
+        repo_norm = min(1.0, math.log1p(max(signals.total_repos, 0)) / math.log1p(120))
+        star_norm = min(1.0, math.log1p(max(signals.total_stars, 0)) / math.log1p(2000))
 
-        # If candidate has competitive programming signals, boost learning velocity
-        if any("algorithmic" in s.name for s in skills):
-            base_velocity += 0.1
+        if signals.years_experience is None:
+            # Missing resume should not be treated as zero experience.
+            # Use neutral prior to prevent instability between runs with/without resume.
+            yoe_norm = 0.55
+        else:
+            yoe_norm = min(max(signals.years_experience, 0.0), 12.0) / 12.0
 
-        learning_velocity = max(0.0, min(1.0, base_velocity))
+        if signals.resume_text or (signals.resume_skills and len(signals.resume_skills) > 0):
+            resume_norm = min(len(signals.resume_skills or []), 12) / 12.0
+        else:
+            # Neutral prior when resume is absent (unknown != weak).
+            resume_norm = 0.55
+
+        # Portfolio signal combines breadth of work and quality signal.
+        portfolio_norm = 0.6 * repo_norm + 0.4 * star_norm
+        cp_signal = 1.0 if any("algorithmic" in s.name for s in skills) else 0.5
+
+        learning_velocity = (
+            0.18
+            + 0.26 * diversity_norm
+            + 0.24 * portfolio_norm
+            + 0.18 * yoe_norm
+            + 0.12 * resume_norm
+            + 0.08 * cp_signal
+        )
+
+        # Keep a realistic bounded range and avoid hard 100% saturation.
+        learning_velocity = max(0.35, min(0.95, learning_velocity))
 
         return SkillGraph(candidate_id=signals.candidate.id, skills=skills, learning_velocity=learning_velocity)

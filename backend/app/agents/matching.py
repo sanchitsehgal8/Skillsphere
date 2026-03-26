@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 import math
 
-from app.models import JobDescription, SkillGraph, MatchScore
+from app.models import JobDescription, SkillGraph, MatchScore, XAIComponent, XAIExplanation
 from app.services.skill_adjacency import GLOBAL_SKILL_GRAPH
 
 
@@ -117,14 +117,96 @@ class MatchingAndRankingAgent:
                 ),
             )
 
+            fit_component = 0.4 * base_sim
+            velocity_component = 0.3 * graph.learning_velocity
+            readiness_component = 0.3 * ttp_score
+
+            components = [
+                XAIComponent(
+                    name="Present Skill Fit",
+                    metric_value=base_sim,
+                    weight=0.4,
+                    contribution=fit_component,
+                    reason="Cosine similarity between candidate skills and role requirements.",
+                ),
+                XAIComponent(
+                    name="Learning Velocity",
+                    metric_value=graph.learning_velocity,
+                    weight=0.3,
+                    contribution=velocity_component,
+                    reason="Estimated ability to ramp quickly on unfamiliar tools.",
+                ),
+                XAIComponent(
+                    name="Productivity Readiness",
+                    metric_value=ttp_score,
+                    weight=0.3,
+                    contribution=readiness_component,
+                    reason="Inverse of time-to-productivity estimate (lower TTP => higher readiness).",
+                ),
+            ]
+
+            direct_set = sorted(set(direct_matches))
+            missing_requirements = [
+                req.name for req in job.requirements if req.name not in direct_set
+            ]
+            coverage_ratio = len(direct_set) / max(1, len(job.requirements))
+            adjacency_evidence = min(0.25, 0.04 * len(adjacent_support))
+            confidence = max(
+                0.0,
+                min(1.0, 0.45 + 0.35 * coverage_ratio + 0.2 * base_sim + adjacency_evidence),
+            )
+
+            if score >= 0.8:
+                summary_label = "Strong match"
+            elif score >= 0.65:
+                summary_label = "Promising match"
+            else:
+                summary_label = "Developing match"
+
+            strengths: list[str] = []
+            if direct_set:
+                strengths.append("Direct requirement matches: " + ", ".join(direct_set[:4]))
+            if graph.learning_velocity >= 0.65:
+                strengths.append("High learning velocity supports faster onboarding.")
+            if ttp_pomodoros is not None:
+                strengths.append(f"Estimated readiness in ~{ttp_pomodoros:.1f} pomodoros.")
+
+            gaps: list[str] = []
+            if missing_requirements:
+                gaps.append("Missing direct coverage: " + ", ".join(missing_requirements[:4]))
+            if not adjacent_support:
+                gaps.append("No strong adjacent skill transfer paths were found.")
+
+            recommendations: list[str] = []
+            if missing_requirements:
+                recommendations.append(
+                    "Prioritize a targeted onboarding plan for: " + ", ".join(missing_requirements[:3]),
+                )
+            if adjacent_support:
+                recommendations.append(
+                    "Leverage adjacent strengths: " + "; ".join(adjacent_support[:2]),
+                )
+            if not recommendations:
+                recommendations.append("Candidate can start with core role tasks immediately.")
+
+            xai = XAIExplanation(
+                summary=(
+                    f"{summary_label}: score {score:.2f} from weighted metrics "
+                    f"(fit {base_sim:.2f}, velocity {graph.learning_velocity:.2f}, readiness {ttp_score:.2f})."
+                ),
+                confidence=confidence,
+                score_components=components,
+                strengths=strengths,
+                gaps=gaps,
+                recommendations=recommendations,
+            )
+
             explanation_parts = [
-                f"Cosine alignment (current skills vs requirements): {base_sim:.2f}.",
-                f"Learning velocity: {graph.learning_velocity:.2f}.",
+                f"Weighted score {score:.2f} = 0.4*fit({base_sim:.2f}) + "
+                f"0.3*velocity({graph.learning_velocity:.2f}) + 0.3*readiness({ttp_score:.2f}).",
             ]
             if ttp_pomodoros is not None and ttp_hours is not None and ttp_sprints is not None:
                 ttp_explanation = (
-                    "Time-to-productivity estimates focused effort needed before the candidate can "
-                    "deliver independently on core role tasks. "
                     f"Estimated effort: {ttp_pomodoros:.1f} pomodoros (~{ttp_hours:.1f} hours, "
                     f"~{ttp_sprints:.2f} sprints)."
                 )
@@ -158,6 +240,7 @@ class MatchingAndRankingAgent:
                     time_to_productivity_explanation=ttp_explanation,
                     direct_matches=direct_matches,
                     adjacent_support=adjacent_support,
+                    xai=xai,
                 )
             )
 

@@ -51,6 +51,23 @@ class SkillGraph(BaseModel):
     learning_velocity: float  # 0-1, how fast the person seems to grow
 
 
+class XAIComponent(BaseModel):
+    name: str
+    metric_value: float
+    weight: float
+    contribution: float
+    reason: str
+
+
+class XAIExplanation(BaseModel):
+    summary: str
+    confidence: float
+    score_components: List[XAIComponent] = []
+    strengths: List[str] = []
+    gaps: List[str] = []
+    recommendations: List[str] = []
+
+
 class MatchScore(BaseModel):
     job_id: str
     candidate_id: str
@@ -62,6 +79,7 @@ class MatchScore(BaseModel):
     time_to_productivity_explanation: str | None = None
     direct_matches: List[str] = []
     adjacent_support: List[str] = []
+    xai: XAIExplanation | None = None
 
 
 class BiasFlag(BaseModel):

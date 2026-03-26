@@ -23,6 +23,17 @@ export async function extractJdFromPdf(file) {
   return data
 }
 
+export async function extractResumeFromPdf(file) {
+  const form = new FormData()
+  form.append('file', file)
+
+  const { data } = await api.post('/candidates/extract-resume-pdf', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  })
+  return data
+}
+
 export async function createCandidate(candidate) {
   const { data } = await api.post('/candidates', candidate)
   return data
@@ -56,7 +67,8 @@ export async function fetchGithubProfile(username) {
   return data
 }
 
-export function buildCandidateFromGithub(username, repos) {
+export function buildCandidateFromGithub(username, repos, options = {}) {
+  const { codeforcesHandle = '', resume = null } = options
   const langCounts = {}
   let totalStars = 0
 
@@ -66,29 +78,53 @@ export function buildCandidateFromGithub(username, repos) {
     totalStars += Number(repo.stargazers_count || 0)
   })
 
+  const platforms = [
+    {
+      platform: 'github',
+      url: `https://github.com/${username}`,
+      metadata: {
+        languages: Object.keys(langCounts).join(','),
+        languages_json: JSON.stringify(langCounts),
+        repo_count: String(repos.length),
+        total_stars: String(totalStars),
+        top_repo: repos[0]?.name || 'unknown',
+      },
+    },
+  ]
+
+  if (codeforcesHandle) {
+    platforms.push({
+      platform: 'codeforces_profile',
+      url: `https://codeforces.com/profile/${codeforcesHandle}`,
+      metadata: { handle: codeforcesHandle },
+    })
+  }
+
+  if (resume?.text) {
+    platforms.push({
+      platform: 'resume',
+      metadata: {
+        resume_text: resume.text,
+        inferred_skills: (resume.skills || []).join(','),
+        years_experience:
+          resume.yearsExperience == null ? '' : String(resume.yearsExperience),
+      },
+    })
+  }
+
   return {
     candidate_id: username,
     name: username,
     headline: 'GitHub Candidate',
     summary: `Open-source footprint: ${repos.length} repos, ${totalStars} stars`,
-    platforms: [
-      {
-        platform: 'github',
-        url: `https://github.com/${username}`,
-        metadata: {
-          languages: Object.keys(langCounts).join(','),
-          languages_json: JSON.stringify(langCounts),
-          repo_count: String(repos.length),
-          total_stars: String(totalStars),
-          top_repo: repos[0]?.name || 'unknown',
-        },
-      },
-    ],
+    platforms,
     demographics: {},
     ui: {
       repos: repos.length,
       stars: totalStars,
       languages: langCounts,
+      resumeSkills: resume?.skills || [],
+      yearsExperience: resume?.yearsExperience ?? null,
     },
   }
 }

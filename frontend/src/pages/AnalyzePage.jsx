@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react'
 import TopBar from '../components/TopBar'
 import SkillRadarChart from '../components/SkillRadarChart'
+import AdjacencyPathGraph from '../components/AdjacencyPathGraph'
 import {
   buildCandidateFromGithub,
   createCandidate,
   createJob,
   extractJdFromPdf,
+  extractResumeFromPdf,
   fetchGithubProfile,
   getAudit,
   getCodeforcesAnalysis,
@@ -19,13 +21,22 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     'Looking for Python, FastAPI, system design, and cloud experience. Strong ownership and communication required.',
   )
   const [candidateBoxes, setCandidateBoxes] = useState([
-    { github: 'sanchitsehgal8', codeforces: '' },
+    {
+      github: 'sanchitsehgal8',
+      codeforces: '',
+      resumeText: '',
+      resumeSkills: [],
+      resumeYearsExperience: null,
+      resumeFileName: '',
+    },
   ])
   const [loading, setLoading] = useState(false)
   const [jdUploading, setJdUploading] = useState(false)
+  const [resumeUploadingIdx, setResumeUploadingIdx] = useState(null)
   const [error, setError] = useState('')
   const [results, setResults] = useState([])
   const jdPdfInputRef = useRef(null)
+  const resumeInputRefs = useRef({})
 
   async function handleJdPdfUpload(e) {
     const file = e.target.files?.[0]
@@ -50,7 +61,17 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   }
 
   function addCandidateBox() {
-    setCandidateBoxes((prev) => [...prev, { github: '', codeforces: '' }])
+    setCandidateBoxes((prev) => [
+      ...prev,
+      {
+        github: '',
+        codeforces: '',
+        resumeText: '',
+        resumeSkills: [],
+        resumeYearsExperience: null,
+        resumeFileName: '',
+      },
+    ])
   }
 
   function removeCandidateBox(index) {
@@ -63,12 +84,47 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     )
   }
 
+  async function handleResumeUpload(index, e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setError('')
+    setResumeUploadingIdx(index)
+    try {
+      const parsed = await extractResumeFromPdf(file)
+      setCandidateBoxes((prev) =>
+        prev.map((row, i) => {
+          if (i !== index) return row
+          return {
+            ...row,
+            resumeText: parsed?.extracted_text || '',
+            resumeSkills: parsed?.inferred_skills || [],
+            resumeYearsExperience: parsed?.estimated_years_experience ?? null,
+            resumeFileName: file.name,
+          }
+        }),
+      )
+    } catch (eUpload) {
+      setError(eUpload?.response?.data?.detail || 'Failed to extract resume data from PDF')
+    } finally {
+      setResumeUploadingIdx(null)
+      e.target.value = ''
+    }
+  }
+
   async function runAnalysis() {
     setLoading(true)
     setError('')
     try {
       const rows = candidateBoxes
-        .map((row) => ({ github: row.github.trim(), codeforces: row.codeforces.trim() }))
+        .map((row) => ({
+          github: row.github.trim(),
+          codeforces: row.codeforces.trim(),
+          resumeText: row.resumeText || '',
+          resumeSkills: row.resumeSkills || [],
+          resumeYearsExperience: row.resumeYearsExperience,
+          resumeFileName: row.resumeFileName || '',
+        }))
         .filter((row) => row.github)
 
       const usernames = rows.map((r) => r.github)
@@ -82,11 +138,26 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
 
       const prepared = []
       const cfByCandidate = {}
-      for (const username of usernames) {
+      for (let i = 0; i < usernames.length; i += 1) {
+        const username = usernames[i]
+        const row = rows[i]
         const repos = await fetchGithubProfile(username)
-        const candidatePayload = buildCandidateFromGithub(username, repos)
+        const candidatePayload = buildCandidateFromGithub(username, repos, {
+          codeforcesHandle: row?.codeforces || '',
+          resume: {
+            text: row?.resumeText || '',
+            skills: row?.resumeSkills || [],
+            yearsExperience: row?.resumeYearsExperience,
+          },
+        })
         await createCandidate(candidatePayload)
-        prepared.push({ username, ui: candidatePayload.ui })
+        prepared.push({
+          username,
+          ui: {
+            ...candidatePayload.ui,
+            resumeFileName: row?.resumeFileName || '',
+          },
+        })
       }
 
       for (let i = 0; i < usernames.length; i += 1) {
@@ -114,6 +185,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
           candidateId: ranked.candidate_id,
           score: ranked.score,
           explanation: ranked.explanation,
+          xai: ranked.xai || null,
           time_to_productivity_pomodoros: ranked.time_to_productivity_pomodoros,
           time_to_productivity_hours: ranked.time_to_productivity_hours,
           time_to_productivity_sprints: ranked.time_to_productivity_sprints,
@@ -208,6 +280,10 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     return items && items.length ? items : [fallback]
   }
 
+  function pct(value) {
+    return `${Math.round((value || 0) * 100)}%`
+  }
+
   return (
     <div className="page analyze-page">
       <TopBar
@@ -262,29 +338,69 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
             <div className="candidate-boxes">
               {candidateBoxes.map((row, idx) => (
                 <div className="candidate-box" key={`cand-box-${idx}`}>
-                  <div className="candidate-inline-inputs">
-                    <input
-                      value={row.codeforces}
-                      onChange={(e) => updateCandidateBox(idx, 'codeforces', e.target.value)}
-                      placeholder="Codeforces Profile URL (optional)"
-                    />
-                    <input
-                      value={row.github}
-                      onChange={(e) => updateCandidateBox(idx, 'github', e.target.value)}
-                      placeholder="GitHub Username (required)"
-                    />
-                  </div>
-                  {candidateBoxes.length > 1 && (
-                    <div className="candidate-box-head">
+                  <div className="candidate-box-top">
+                    <h4 className="candidate-box-title">Candidate {idx + 1}</h4>
+                    {candidateBoxes.length > 1 && (
                       <button
                         type="button"
                         className="ghost-btn"
                         onClick={() => removeCandidateBox(idx)}
                       >
-                        Remove Candidate
+                        Remove
                       </button>
+                    )}
+                  </div>
+
+                  <div className="candidate-field-grid">
+                    <div className="candidate-field">
+                      <label className="field-label">GitHub Username</label>
+                      <input
+                        value={row.github}
+                        onChange={(e) => updateCandidateBox(idx, 'github', e.target.value)}
+                        placeholder="required"
+                      />
                     </div>
-                  )}
+
+                    <div className="candidate-field">
+                      <label className="field-label">Codeforces Profile URL</label>
+                      <input
+                        value={row.codeforces}
+                        onChange={(e) => updateCandidateBox(idx, 'codeforces', e.target.value)}
+                        placeholder="optional"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="candidate-box-head">
+                    <input
+                      ref={(el) => {
+                        resumeInputRefs.current[idx] = el
+                      }}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={(e) => handleResumeUpload(idx, e)}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => resumeInputRefs.current[idx]?.click()}
+                      disabled={resumeUploadingIdx === idx}
+                    >
+                      {resumeUploadingIdx === idx ? 'Uploading Resume...' : 'Add Resume PDF'}
+                    </button>
+                    {row.resumeFileName && (
+                      <span className="resume-meta">
+                        {row.resumeFileName}
+                        {row.resumeSkills?.length
+                          ? ` • ${row.resumeSkills.slice(0, 4).join(', ')}`
+                          : ''}
+                        {row.resumeYearsExperience != null
+                          ? ` • ${row.resumeYearsExperience} years`
+                          : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -394,6 +510,9 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
                 ))}
               </div>
               <p className="subtle-copy"><strong>Adjacency potential:</strong> Skills that can transfer quickly to missing requirements.</p>
+
+              <h4>Adjacency Graph</h4>
+              <AdjacencyPathGraph paths={r.adjacent_support || []} />
             </div>
 
             {r.codeforces && (
@@ -414,10 +533,72 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
               <SkillRadarChart candidate={r} />
               <p className="subtle-copy"><strong>Adjacency map:</strong> {r.adjacent_support?.join('; ') || 'No adjacent transfer paths found for this role.'}</p>
             </div>
+
+            {r.xai && (
+              <div className="result-section xai-section">
+                <h4>Explainable AI Breakdown</h4>
+                <p className="subtle-copy">{r.xai.summary}</p>
+                <div className="metric-grid">
+                  <div className="metric-item">
+                    <span className="k">Model Confidence</span>
+                    <strong>{pct(r.xai.confidence)}</strong>
+                  </div>
+                </div>
+
+                <div className="xai-rows">
+                  {(r.xai.score_components || []).map((c) => (
+                    <div className="xai-row" key={`${r.candidateId}-${c.name}`}>
+                      <div className="xai-row-head">
+                        <strong>{c.name}</strong>
+                        <span>{pct(c.contribution)}</span>
+                      </div>
+                      <div className="xai-track">
+                        <span className="xai-fill" style={{ width: pct(c.contribution) }} />
+                      </div>
+                      <p className="subtle-copy">{c.reason}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {!!r.xai.strengths?.length && (
+                  <>
+                    <h4>Strengths</h4>
+                    <ul className="xai-list">
+                      {r.xai.strengths.map((s, i) => (
+                        <li key={`${r.candidateId}-st-${i}`}>{s}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {!!r.xai.gaps?.length && (
+                  <>
+                    <h4>Gaps</h4>
+                    <ul className="xai-list">
+                      {r.xai.gaps.map((g, i) => (
+                        <li key={`${r.candidateId}-gp-${i}`}>{g}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {!!r.xai.recommendations?.length && (
+                  <>
+                    <h4>Recommendations</h4>
+                    <ul className="xai-list">
+                      {r.xai.recommendations.map((rec, i) => (
+                        <li key={`${r.candidateId}-rc-${i}`}>{rec}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+
             <details>
-              <summary>Why this match? (Full explanation)</summary>
+              <summary>Raw engine logs (advanced)</summary>
               <p className="subtle-copy">{r.explanation}</p>
-              <p className="subtle-copy">{r.copilot}</p>
+              {r.copilot && <p className="subtle-copy">{r.copilot}</p>}
             </details>
           </article>
         ))}

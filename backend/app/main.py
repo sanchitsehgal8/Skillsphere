@@ -13,6 +13,7 @@ from app.models import CandidateProfile, JobDescription, SkillGraph
 from app.schemas.api import (
     CreateJobRequest,
     ExtractJobDescriptionResponse,
+    ExtractResumeResponse,
     CreateCandidateRequest,
     RunMatchingRequest,
     RunMatchingResponse,
@@ -25,6 +26,11 @@ from app.schemas.api import (
 )
 from app.services.codeforces_analyzer import analyze_codeforces_handle
 from app.services.jd_parser import extract_text_from_pdf_bytes, suggest_title_from_jd
+from app.services.resume_parser import (
+    extract_text_from_resume_bytes,
+    infer_resume_skills,
+    infer_years_experience,
+)
 
 app = FastAPI(title="SkillSphere Talent Intelligence Engine")
 app.add_middleware(
@@ -81,6 +87,34 @@ async def extract_jd_pdf(file: UploadFile = File(...)) -> ExtractJobDescriptionR
     return ExtractJobDescriptionResponse(
         extracted_text=extracted,
         suggested_title=suggest_title_from_jd(extracted),
+    )
+
+
+@app.post("/candidates/extract-resume-pdf", response_model=ExtractResumeResponse)
+async def extract_candidate_resume_pdf(file: UploadFile = File(...)) -> ExtractResumeResponse:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Please upload a resume PDF file.")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded resume file is empty.")
+
+    try:
+        extracted = extract_text_from_resume_bytes(raw)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Failed to read resume PDF: {exc}") from exc
+
+    if not extracted:
+        raise HTTPException(status_code=400, detail="Could not extract readable text from this resume.")
+
+    inferred_skills = infer_resume_skills(extracted)
+    years_experience = infer_years_experience(extracted)
+
+    return ExtractResumeResponse(
+        extracted_text=extracted,
+        inferred_skills=inferred_skills,
+        estimated_years_experience=years_experience,
     )
 
 
@@ -150,6 +184,7 @@ async def run_matching(req: RunMatchingRequest) -> RunMatchingResponse:
             time_to_productivity_explanation=s.time_to_productivity_explanation,
             direct_matches=s.direct_matches,
             adjacent_support=s.adjacent_support,
+            xai=s.xai.model_dump() if s.xai is not None else None,
         )
         for s in ranked_scores
     ]
