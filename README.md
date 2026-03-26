@@ -1,124 +1,84 @@
 # SkillSphere
 
-## Overview
+SkillSphere is a full-stack talent intelligence platform for recruiter workflows. It combines a React frontend with a FastAPI backend and an agent-style scoring pipeline to analyze candidate fit beyond keyword matching.
 
-SkillSphere is an agentic, AI-powered talent intelligence engine that thinks like your best recruiter. Instead of blindly keyword-matching resumes, it uses specialised AI agents to:
+---
 
-- Understand job descriptions as structured requirement graphs.
-- Scout public signals across platforms (GitHub, LeetCode, Codeforces profile, Kaggle, portfolios).
-- Build a Skill DNA graph per candidate and estimate learning velocity.
-- Rank candidates by a mix of present fit and growth potential.
-- Run a fairness pass to surface potential demographic bias.
-- Provide a recruiter co-pilot interface that explains every recommendation.
+## Current Product Scope
 
-This repository currently ships a fully runnable backend prototype implemented in Python with FastAPI.
+### Frontend (React + Vite)
 
-## Backend (FastAPI) – `backend/`
+- Dashboard, Candidates, Analyze, Profile, and Settings pages
+- Analyze workflow supports **multiple candidates** in separate cards
+- Upload and parse:
+  - JD PDF (auto-fills job description)
+  - Resume PDF per candidate (extracts text, inferred skills, and years of experience)
+- Candidate enrichment from:
+  - GitHub repositories/languages/stars
+  - Optional Codeforces handle
+  - Resume-derived signals
+- Analysis results on the **same Analyze page** (form + results view)
+- Explainable AI section with weighted metric breakdown, confidence, strengths, gaps, and recommendations
+- Adjacency path visualization for transferable skills
+- CSV export support on dashboard/analyze views
 
-### Key Components
+### Backend (FastAPI)
 
-- Job Intelligence Agent: parses a free-form JD into a role requirement graph.
-- Talent Scout Agent: simulates evidence gathering across platforms.
-- Skill Graph Builder Agent: creates candidate Skill DNA and learning velocity.
-- Matching & Ranking Agent: computes cosine-like similarity between roles and skills.
-- Bias Auditor Agent: runs a lightweight fairness audit over ranked candidates.
-- Recruiter Co-Pilot Agent: returns readable explanations for candidates and shortlists.
+- Agent pipeline:
+  - Job Intelligence Agent
+  - Talent Scout Agent
+  - Skill Graph Builder Agent
+  - Matching & Ranking Agent
+  - Bias Auditor Agent
+  - Recruiter Copilot Agent
+- Score combines:
+  - Present Skill Fit (cosine alignment)
+  - Learning Velocity
+  - Productivity Readiness (TTP-derived)
+- Structured XAI response included in `/match`
+- Fairness audit endpoint and recruiter copilot summaries
+- Codeforces analytics endpoint with profile/problem/contest insights
 
-All logic is deterministic and runs locally without external APIs; the architecture is designed so you can later plug in real LLMs, vector DBs, and platform APIs.
+> Note: storage is currently in-memory (demo/prototype mode).
 
-## Getting Started
+---
 
-### 1. Create and activate a virtual environment (recommended)
+## Repository Structure
+
+```text
+backend/
+  app/
+    agents/
+    services/
+    schemas/
+    main.py
+  streamlit_app.py
+frontend/
+  src/
+    pages/
+    components/
+README.md
+```
+
+---
+
+## Quick Start
+
+## 1) Backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # on macOS/Linux
-```
-
-### 2. Install dependencies
-
-```bash
+source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-### 3. Run the API server
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-The API will be available at: http://127.0.0.1:8000
-Interactive docs (Swagger UI) are at: http://127.0.0.1:8000/docs
+Backend:
+- API: http://127.0.0.1:8000
+- Swagger docs: http://127.0.0.1:8000/docs
 
-## Example Flow (End-to-End)
-
-1. Create a job description:
-
-	 ```bash
-	 curl -X POST http://127.0.0.1:8000/jobs \
-		 -H "Content-Type: application/json" \
-		 -d '{
-			 "job_id": "backend-engineer-1",
-			 "title": "Backend Engineer (Python/LLMs)",
-			 "description": "We are looking for a backend engineer with strong Python, FastAPI, and machine learning experience, plus good communication and ownership."
-		 }'
-	 ```
-
-2. Create one or more candidates:
-
-	 ```bash
-	 curl -X POST http://127.0.0.1:8000/candidates \
-		 -H "Content-Type: application/json" \
-		 -d '{
-			 "candidate_id": "cand-1",
-			 "name": "Aisha Dev",
-			 "headline": "Backend + ML Engineer",
-			 "summary": "Works on LLM tooling and high-scale APIs.",
-			 "platforms": [
-				 {"platform": "github", "metadata": {"top_repo": "llm-routing-service"}},
-				 {"platform": "leetcode", "metadata": {"rating": "advanced"}},
-				 {"platform": "codeforces_profile", "metadata": {}}
-			 ],
-			 "demographics": {"gender": "female"}
-		 }'
-	 ```
-
-3. Run matching for the job and candidates:
-
-	 ```bash
-	 curl -X POST http://127.0.0.1:8000/match \
-		 -H "Content-Type: application/json" \
-		 -d '{
-			 "job_id": "backend-engineer-1",
-			 "candidate_ids": ["cand-1"]
-		 }'
-	 ```
-
-4. Inspect the bias audit log:
-
-	 ```bash
-	 curl http://127.0.0.1:8000/audit/backend-engineer-1
-	 ```
-
-5. Ask the Recruiter Co-Pilot for an explanation:
-
-	 ```bash
-	 curl -X POST http://127.0.0.1:8000/copilot \
-		 -H "Content-Type: application/json" \
-		 -d '{
-			 "job_id": "backend-engineer-1",
-			 "candidate_id": "cand-1"
-		 }'
-	 ```
-
-This will return a natural-language-style summary of the candidate, their Skill DNA, learning velocity, match score, and any fairness flags.
-
-## Frontend (React + Vite) – `frontend/`
-
-A full interactive recruiter UI is available and connected to the backend APIs.
-
-### Run the frontend
+## 2) Frontend
 
 ```bash
 cd frontend
@@ -126,41 +86,106 @@ npm install
 npm run dev
 ```
 
-Open: http://127.0.0.1:5173
+Frontend:
+- App: http://127.0.0.1:5173
 
-### Required backend for frontend
+If needed, set `VITE_API_BASE` in frontend env to point to backend (defaults to `http://127.0.0.1:8000`).
 
-In another terminal:
+---
+
+## Core API Endpoints
+
+### Jobs
+
+- `POST /jobs` — create job and role graph
+- `GET /jobs/{job_id}` — fetch job
+- `POST /jobs/extract-jd-pdf` — extract text + suggested title from JD PDF
+
+### Candidates
+
+- `POST /candidates` — create candidate and build skill graph
+- `GET /candidates/{candidate_id}` — fetch candidate
+- `POST /candidates/extract-resume-pdf` — parse resume PDF, infer skills + years experience
+
+### Matching + Explainability
+
+- `POST /match` — rank candidates and return:
+  - score
+  - explanation
+  - time-to-productivity metrics
+  - direct matches
+  - adjacency support
+  - XAI block (components, confidence, strengths/gaps/recommendations)
+- `GET /audit/{job_id}` — fairness audit output
+- `POST /copilot` — natural-language recruiter summary
+
+### Codeforces
+
+- `GET /codeforces/{handle}/analysis` — rating trajectory, consistency, tag gaps, mentor-style verdict
+
+---
+
+## End-to-End Flow (UI)
+
+1. Open **Analyze Candidate** page
+2. Provide job title/description (or upload JD PDF)
+3. Add one or more candidate cards
+4. For each candidate:
+   - GitHub username (required)
+   - Codeforces URL/handle (optional)
+   - Resume PDF (optional, but recommended)
+5. Click **Analyze Candidate**
+6. Review results on the same page:
+   - score + TTP snapshot
+   - role fit + adjacency graph
+   - Codeforces benchmark (if available)
+   - XAI breakdown
+   - raw logs (advanced)
+
+---
+
+## Dependencies
+
+Backend (`backend/requirements.txt`):
+- `fastapi`
+- `uvicorn[standard]`
+- `pydantic`
+- `requests`
+- `pypdf`
+- `streamlit`
+- `transformers`
+
+Frontend (`frontend/package.json`):
+- `react`
+- `react-dom`
+- `react-router-dom`
+- `axios`
+- `vite`
+
+---
+
+## Optional Streamlit Prototype
 
 ```bash
 cd backend
-source .venv311/bin/activate
-uvicorn app.main:app --reload
-```
-
-### Frontend Features
-
-- Login-style landing page
-- Dashboard with analysis KPIs and recent runs
-- Candidate list with score, direct matches, and adjacency support
-- Analyze Candidate workflow (GitHub usernames + job description)
-- Live integration with backend endpoints: `/jobs`, `/candidates`, `/match`, `/audit`, `/copilot`
-
-## Streamlit Demo Note
-
-If you use the Streamlit prototype, run:
-
-```bash
-cd backend
-source .venv311/bin/activate
+source .venv/bin/activate
 streamlit run streamlit_app.py
 ```
 
-Do not run `streamlit run app.py` (that file does not exist).
+---
 
-## Next Steps
+## Known Limitations
 
-- Swap heuristic components for real LLMs using LangGraph or similar.
-- Plug in actual platform APIs (GitHub, LeetCode, Codeforces profile, Kaggle, portfolios).
-- Replace in-memory stores with a database and vector store (e.g., FAISS).
-- Extend the fairness and DEI auditing layer with more robust metrics.
+- In-memory backend state resets on server restart
+- Heuristic scoring (interpretable and deterministic) rather than a trained model
+- External data quality depends on public profile availability (GitHub/Codeforces)
+
+---
+
+## Roadmap Ideas
+
+- Persistent DB + vector store
+- Async background analysis jobs
+- Richer calibration/validation for learning velocity
+- Team-level benchmark dashboards
+- LLM-assisted recruiter co-pilot with grounded retrieval

@@ -9,6 +9,8 @@ import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 
 function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
+  const location = useLocation()
+
   const analysesByCandidate = useMemo(() => {
     const map = {}
     analyses.forEach((a) => {
@@ -24,11 +26,15 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
     setAnalyses((prev) => [...items, ...prev])
   }
 
+  const isLoginRoute = location.pathname === '/login'
+
   return (
-    <div className="app-shell">
-      <Sidebar onLogout={() => setAnalyses([])} />
-      <main className="main">
+    <div className={`app-shell ${isLoginRoute ? 'login-layout' : ''}`}>
+      {!isLoginRoute && <Sidebar />}
+      <main className={`main ${isLoginRoute ? 'main-login' : ''}`}>
         <Routes>
+          <Route path="/login" element={<LoginPage theme={theme} onToggleTheme={onToggleTheme} />} />
+
           <Route
             path="/dashboard"
             element={<DashboardPage analyses={analyses} theme={theme} onToggleTheme={onToggleTheme} />}
@@ -42,6 +48,10 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
             element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
           />
           <Route
+            path="/analyze/results"
+            element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
+          />
+          <Route
             path="/settings"
             element={<SettingsPage theme={theme} onToggleTheme={onToggleTheme} />}
           />
@@ -49,7 +59,9 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
             path="/profile"
             element={<ProfilePage theme={theme} onToggleTheme={onToggleTheme} />}
           />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </main>
     </div>
@@ -59,7 +71,6 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
 export default function App() {
   const [analyses, setAnalyses] = useState([])
   const [theme, setTheme] = useState('dark')
-  const location = useLocation()
 
   useEffect(() => {
     const saved = localStorage.getItem('skillsphere-theme')
@@ -78,10 +89,6 @@ export default function App() {
 
   function toggleTheme() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
-  }
-
-  if (location.pathname === '/') {
-    return <LoginPage theme={theme} onToggleTheme={toggleTheme} />
   }
 
   return (

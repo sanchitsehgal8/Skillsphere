@@ -67,7 +67,9 @@ async def create_job(req: CreateJobRequest) -> JobDescription:
 
 
 @app.post("/jobs/extract-jd-pdf", response_model=ExtractJobDescriptionResponse)
-async def extract_jd_pdf(file: UploadFile = File(...)) -> ExtractJobDescriptionResponse:
+async def extract_jd_pdf(
+    file: UploadFile = File(...),
+) -> ExtractJobDescriptionResponse:
     filename = (file.filename or "").lower()
     if not filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF file.")
@@ -91,7 +93,9 @@ async def extract_jd_pdf(file: UploadFile = File(...)) -> ExtractJobDescriptionR
 
 
 @app.post("/candidates/extract-resume-pdf", response_model=ExtractResumeResponse)
-async def extract_candidate_resume_pdf(file: UploadFile = File(...)) -> ExtractResumeResponse:
+async def extract_candidate_resume_pdf(
+    file: UploadFile = File(...),
+) -> ExtractResumeResponse:
     filename = (file.filename or "").lower()
     if not filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a resume PDF file.")

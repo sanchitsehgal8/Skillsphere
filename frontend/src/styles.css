@@ -2654,6 +2654,34 @@ th {
   font-size: 1.02rem;
 }
 
+.login-shell-v2 .auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.login-shell-v2 .auth-tab {
+  border: 1px solid #d7d0c8;
+  background: #fff;
+  color: #6d635c;
+  border-radius: 8px;
+  height: 42px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-shell-v2 .auth-tab.active {
+  color: #fff;
+  border-color: #c85a2e;
+  background: linear-gradient(90deg, #be4f25, #dc6a31);
+}
+
+.login-shell-v2 .auth-form {
+  display: grid;
+  gap: 8px;
+}
+
 .login-shell-v2 .field-label {
   color: #726a63;
   text-transform: uppercase;
@@ -2708,6 +2736,19 @@ th {
   border-radius: 9px;
   background: linear-gradient(90deg, #c84c1f, #de692f);
   font-size: 0.97rem;
+}
+
+.login-shell-v2 .auth-error {
+  margin: 0;
+  color: #b93d1e;
+  font-size: 0.82rem;
+}
+
+.login-shell-v2 .auth-notice {
+  margin: 0;
+  color: #2d6f4f;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .login-shell-v2 .divider {
@@ -2777,6 +2818,16 @@ th {
   .profile-actions .primary-btn {
     flex: 1;
   }
+}
+
+.app-shell.login-layout {
+  grid-template-columns: 1fr !important;
+}
+
+.app-shell.login-layout > .main.main-login {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 0 !important;
 }
 
 @media (max-width: 1200px) {

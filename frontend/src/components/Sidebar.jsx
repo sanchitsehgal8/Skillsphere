@@ -7,7 +7,7 @@ const navItems = [
   { to: '/profile', label: 'Profile' },
 ]
 
-export default function Sidebar({ onLogout }) {
+export default function Sidebar() {
   const navigate = useNavigate()
 
   function handleSettings() {
@@ -15,8 +15,7 @@ export default function Sidebar({ onLogout }) {
   }
 
   function handleLogout() {
-    onLogout?.()
-    navigate('/')
+    navigate('/login')
   }
 
   return (
