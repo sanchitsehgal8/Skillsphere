@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.job_intelligence import JobIntelligenceAgent, RoleRequirementGraph
@@ -31,6 +31,7 @@ from app.services.resume_parser import (
     infer_resume_skills,
     infer_years_experience,
 )
+from app.auth import get_current_user
 
 app = FastAPI(title="SkillSphere Talent Intelligence Engine")
 app.add_middleware(
@@ -60,7 +61,7 @@ _copilot_agent = RecruiterCopilotAgent()
 
 
 @app.post("/jobs", response_model=JobDescription)
-async def create_job(req: CreateJobRequest) -> JobDescription:
+async def create_job(req: CreateJobRequest, user=Depends(get_current_user)) -> JobDescription:
     graph = _job_agent.build_role_graph(job_id=req.job_id, title=req.title, description=req.description)
     _JOBS[req.job_id] = graph
     return graph.job
@@ -69,6 +70,7 @@ async def create_job(req: CreateJobRequest) -> JobDescription:
 @app.post("/jobs/extract-jd-pdf", response_model=ExtractJobDescriptionResponse)
 async def extract_jd_pdf(
     file: UploadFile = File(...),
+    user=Depends(get_current_user),
 ) -> ExtractJobDescriptionResponse:
     filename = (file.filename or "").lower()
     if not filename.endswith(".pdf"):
@@ -95,6 +97,7 @@ async def extract_jd_pdf(
 @app.post("/candidates/extract-resume-pdf", response_model=ExtractResumeResponse)
 async def extract_candidate_resume_pdf(
     file: UploadFile = File(...),
+    user=Depends(get_current_user),
 ) -> ExtractResumeResponse:
     filename = (file.filename or "").lower()
     if not filename.endswith(".pdf"):
@@ -124,7 +127,7 @@ async def extract_candidate_resume_pdf(
 
 
 @app.get("/jobs/{job_id}", response_model=JobDescription)
-async def get_job(job_id: str) -> JobDescription:
+async def get_job(job_id: str, user=Depends(get_current_user)) -> JobDescription:
     graph = _JOBS.get(job_id)
     if not graph:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -132,7 +135,7 @@ async def get_job(job_id: str) -> JobDescription:
 
 
 @app.post("/candidates", response_model=CandidateProfile)
-async def create_candidate(req: CreateCandidateRequest) -> CandidateProfile:
+async def create_candidate(req: CreateCandidateRequest, user=Depends(get_current_user)) -> CandidateProfile:
     profile = CandidateProfile(
         id=req.candidate_id,
         name=req.name,
@@ -151,7 +154,7 @@ async def create_candidate(req: CreateCandidateRequest) -> CandidateProfile:
 
 
 @app.get("/candidates/{candidate_id}", response_model=CandidateProfile)
-async def get_candidate(candidate_id: str) -> CandidateProfile:
+async def get_candidate(candidate_id: str, user=Depends(get_current_user)) -> CandidateProfile:
     cand = _CANDIDATES.get(candidate_id)
     if not cand:
         raise HTTPException(status_code=404, detail="Candidate not found")
@@ -159,7 +162,7 @@ async def get_candidate(candidate_id: str) -> CandidateProfile:
 
 
 @app.post("/match", response_model=RunMatchingResponse)
-async def run_matching(req: RunMatchingRequest) -> RunMatchingResponse:
+async def run_matching(req: RunMatchingRequest, user=Depends(get_current_user)) -> RunMatchingResponse:
     job_graph = _JOBS.get(req.job_id)
     if not job_graph:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -201,7 +204,7 @@ async def run_matching(req: RunMatchingRequest) -> RunMatchingResponse:
 
 
 @app.get("/audit/{job_id}", response_model=AuditLogResponse)
-async def get_audit(job_id: str) -> AuditLogResponse:
+async def get_audit(job_id: str, user=Depends(get_current_user)) -> AuditLogResponse:
     all_logs: Dict[str, List] = getattr(app.state, "audit_logs", {})
     logs = all_logs.get(job_id, [])
 
@@ -217,7 +220,7 @@ async def get_audit(job_id: str) -> AuditLogResponse:
 
 
 @app.post("/copilot", response_model=CopilotResponse)
-async def copilot(query: CopilotQueryRequest) -> CopilotResponse:
+async def copilot(query: CopilotQueryRequest, user=Depends(get_current_user)) -> CopilotResponse:
     job_graph = _JOBS.get(query.job_id)
     if not job_graph:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -263,7 +266,7 @@ async def copilot(query: CopilotQueryRequest) -> CopilotResponse:
 
 
 @app.get("/codeforces/{handle}/analysis", response_model=CodeforcesAnalysisResponse)
-async def codeforces_analysis(handle: str) -> CodeforcesAnalysisResponse:
+async def codeforces_analysis(handle: str, user=Depends(get_current_user)) -> CodeforcesAnalysisResponse:
     try:
         data = analyze_codeforces_handle(handle)
         return CodeforcesAnalysisResponse(**data)

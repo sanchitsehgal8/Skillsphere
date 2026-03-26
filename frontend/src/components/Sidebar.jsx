@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -9,12 +10,14 @@ const navItems = [
 
 export default function Sidebar() {
   const navigate = useNavigate()
+  const { signOut } = useAuth()
 
   function handleSettings() {
     navigate('/settings')
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await signOut()
     navigate('/login')
   }
 

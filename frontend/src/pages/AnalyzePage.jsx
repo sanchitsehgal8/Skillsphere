@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import SkillRadarChart from '../components/SkillRadarChart'
 import AdjacencyPathGraph from '../components/AdjacencyPathGraph'
+import supabase from '../supabaseClient'
 import {
   buildCandidateFromGithub,
   createCandidate,
@@ -16,6 +18,7 @@ import {
 } from '../api/client'
 
 export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
+  const navigate = useNavigate()
   const [jobTitle, setJobTitle] = useState('Backend Engineer (Python/FastAPI)')
   const [jobDescription, setJobDescription] = useState(
     'Looking for Python, FastAPI, system design, and cloud experience. Strong ownership and communication required.',
@@ -38,14 +41,37 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   const jdPdfInputRef = useRef(null)
   const resumeInputRefs = useRef({})
 
+  async function getTokenOrRedirect() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      navigate('/login')
+      return null
+    }
+
+    return session.access_token
+  }
+
   async function handleJdPdfUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const token = await getTokenOrRedirect()
+    if (!token) {
+      e.target.value = ''
+      return
+    }
+
     setError('')
     setJdUploading(true)
     try {
-      const parsed = await extractJdFromPdf(file)
+      const parsed = await extractJdFromPdf(file, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       if (parsed?.extracted_text) {
         setJobDescription(parsed.extracted_text)
       }
@@ -88,10 +114,20 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const token = await getTokenOrRedirect()
+    if (!token) {
+      e.target.value = ''
+      return
+    }
+
     setError('')
     setResumeUploadingIdx(index)
     try {
-      const parsed = await extractResumeFromPdf(file)
+      const parsed = await extractResumeFromPdf(file, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       setCandidateBoxes((prev) =>
         prev.map((row, i) => {
           if (i !== index) return row
@@ -113,6 +149,16 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
   }
 
   async function runAnalysis() {
+    const token = await getTokenOrRedirect()
+    if (!token) return
+
+    const jsonConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    }
+
     setLoading(true)
     setError('')
     try {
@@ -134,7 +180,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
       }
 
       const jobId = `react-${Date.now()}`
-      await createJob({ job_id: jobId, title: jobTitle, description: jobDescription })
+      await createJob({ job_id: jobId, title: jobTitle, description: jobDescription }, jsonConfig)
 
       const prepared = []
       const cfByCandidate = {}
@@ -150,7 +196,7 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
             yearsExperience: row?.resumeYearsExperience,
           },
         })
-        await createCandidate(candidatePayload)
+        await createCandidate(candidatePayload, jsonConfig)
         prepared.push({
           username,
           ui: {
@@ -164,19 +210,19 @@ export default function AnalyzePage({ onNewAnalyses, theme, onToggleTheme }) {
         const candidateId = usernames[i]
         const mappedHandle = rows[i]?.codeforces || candidateId
         try {
-          const cf = await getCodeforcesAnalysis(mappedHandle)
+          const cf = await getCodeforcesAnalysis(mappedHandle, jsonConfig)
           cfByCandidate[candidateId] = cf
         } catch {
           cfByCandidate[candidateId] = null
         }
       }
 
-      const matchData = await runMatch(jobId, usernames)
-      const audit = await getAudit(jobId)
+      const matchData = await runMatch(jobId, usernames, jsonConfig)
+      const audit = await getAudit(jobId, jsonConfig)
 
       const enriched = []
       for (const ranked of matchData.ranked) {
-        const copilot = await getCopilot(jobId, ranked.candidate_id)
+        const copilot = await getCopilot(jobId, ranked.candidate_id, jsonConfig)
         const aud = audit.entries.find((e) => e.candidate_id === ranked.candidate_id)
         const uiMeta = prepared.find((p) => p.username === ranked.candidate_id)?.ui
 

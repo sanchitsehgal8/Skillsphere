@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import Sidebar from './components/Sidebar'
+import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import CandidatesPage from './pages/CandidatesPage'
@@ -35,30 +36,32 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
         <Routes>
           <Route path="/login" element={<LoginPage theme={theme} onToggleTheme={onToggleTheme} />} />
 
-          <Route
-            path="/dashboard"
-            element={<DashboardPage analyses={analyses} theme={theme} onToggleTheme={onToggleTheme} />}
-          />
-          <Route
-            path="/candidates"
-            element={<CandidatesPage analysesByCandidate={analysesByCandidate} theme={theme} onToggleTheme={onToggleTheme} />}
-          />
-          <Route
-            path="/analyze"
-            element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
-          />
-          <Route
-            path="/analyze/results"
-            element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
-          />
-          <Route
-            path="/settings"
-            element={<SettingsPage theme={theme} onToggleTheme={onToggleTheme} />}
-          />
-          <Route
-            path="/profile"
-            element={<ProfilePage theme={theme} onToggleTheme={onToggleTheme} />}
-          />
+          <Route element={<PrivateRoute />}>
+            <Route
+              path="/dashboard"
+              element={<DashboardPage analyses={analyses} theme={theme} onToggleTheme={onToggleTheme} />}
+            />
+            <Route
+              path="/candidates"
+              element={<CandidatesPage analysesByCandidate={analysesByCandidate} theme={theme} onToggleTheme={onToggleTheme} />}
+            />
+            <Route
+              path="/analyze"
+              element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
+            />
+            <Route
+              path="/analyze/results"
+              element={<AnalyzePage onNewAnalyses={onNewAnalyses} theme={theme} onToggleTheme={onToggleTheme} />}
+            />
+            <Route
+              path="/settings"
+              element={<SettingsPage theme={theme} onToggleTheme={onToggleTheme} />}
+            />
+            <Route
+              path="/profile"
+              element={<ProfilePage theme={theme} onToggleTheme={onToggleTheme} />}
+            />
+          </Route>
 
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />

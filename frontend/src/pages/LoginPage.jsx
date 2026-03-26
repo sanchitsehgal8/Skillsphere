@@ -1,7 +1,62 @@
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage({ theme, onToggleTheme }) {
 	const navigate = useNavigate()
+	const { user, signIn, signUp } = useAuth()
+	const [tab, setTab] = useState('signin')
+	const [signInEmail, setSignInEmail] = useState('')
+	const [signInPassword, setSignInPassword] = useState('')
+	const [signUpEmail, setSignUpEmail] = useState('')
+	const [signUpPassword, setSignUpPassword] = useState('')
+	const [confirmPassword, setConfirmPassword] = useState('')
+	const [showSignInPassword, setShowSignInPassword] = useState(false)
+	const [showSignUpPassword, setShowSignUpPassword] = useState(false)
+	const [error, setError] = useState('')
+	const [message, setMessage] = useState('')
+	const [submitting, setSubmitting] = useState(false)
+
+	if (user) {
+		return <Navigate to="/dashboard" replace />
+	}
+
+	async function handleSignIn(e) {
+		e.preventDefault()
+		setSubmitting(true)
+		setError('')
+		setMessage('')
+		const { error: authError } = await signIn(signInEmail, signInPassword)
+		if (authError) {
+			setError(authError.message)
+			setSubmitting(false)
+			return
+		}
+		navigate('/dashboard')
+	}
+
+	async function handleSignUp(e) {
+		e.preventDefault()
+		setSubmitting(true)
+		setError('')
+		setMessage('')
+
+		if (signUpPassword !== confirmPassword) {
+			setError('Passwords do not match.')
+			setSubmitting(false)
+			return
+		}
+
+		const { error: authError } = await signUp(signUpEmail, signUpPassword)
+		if (authError) {
+			setError(authError.message)
+			setSubmitting(false)
+			return
+		}
+
+		setMessage('Check your email to confirm your account.')
+		setSubmitting(false)
+	}
 
 	return (
 		<div className="login-shell login-shell-v2">
@@ -73,30 +128,110 @@ export default function LoginPage({ theme, onToggleTheme }) {
 				<h2 className="login-form-title">Welcome Back</h2>
 				<p className="login-form-subtitle">Enter your credentials to access the curator dashboard.</p>
 
-				<label className="field-label">Email Address</label>
-				<input placeholder="name@company.com" />
-
-				<div className="password-row">
-					<label className="field-label">Password</label>
-					<button type="button" className="forgot-link">Forgot password?</button>
+				<div className="social-row" role="tablist" aria-label="Auth tabs">
+					<button
+						type="button"
+						className="google-btn social-btn"
+						onClick={() => {
+							setTab('signin')
+							setError('')
+							setMessage('')
+						}}
+					>
+						Sign in
+					</button>
+					<button
+						type="button"
+						className="google-btn social-btn"
+						onClick={() => {
+							setTab('signup')
+							setError('')
+							setMessage('')
+						}}
+					>
+						Sign up
+					</button>
 				</div>
-				<input placeholder="••••••••" type="password" />
 
-				<label className="remember-row">
-					<input type="checkbox" />
-					Keep me signed in for 30 days
-				</label>
+				{tab === 'signin' ? (
+					<form onSubmit={handleSignIn}>
+						<label className="field-label">Email Address</label>
+						<input
+							placeholder="name@company.com"
+							type="email"
+							value={signInEmail}
+							onChange={(e) => setSignInEmail(e.target.value)}
+							required
+						/>
 
-				<button className="primary-btn full login-submit" onClick={() => navigate('/dashboard')}>
-					Sign In to Workspace
-				</button>
+						<div className="password-row">
+							<label className="field-label">Password</label>
+							<button
+								type="button"
+								className="forgot-link"
+								onClick={() => setShowSignInPassword((prev) => !prev)}
+							>
+								{showSignInPassword ? 'Hide' : 'See'} password
+							</button>
+						</div>
+						<input
+							placeholder="••••••••"
+							type={showSignInPassword ? 'text' : 'password'}
+							value={signInPassword}
+							onChange={(e) => setSignInPassword(e.target.value)}
+							required
+						/>
 
-				<div className="divider">OR CONTINUE WITH</div>
+						<button className="primary-btn full login-submit" type="submit" disabled={submitting}>
+							{submitting ? 'Signing in...' : 'Sign In to Workspace'}
+						</button>
+					</form>
+				) : (
+					<form onSubmit={handleSignUp}>
+						<label className="field-label">Email Address</label>
+						<input
+							placeholder="name@company.com"
+							type="email"
+							value={signUpEmail}
+							onChange={(e) => setSignUpEmail(e.target.value)}
+							required
+						/>
 
-				<div className="social-row">
-					<button className="google-btn social-btn" onClick={() => navigate('/dashboard')}>Google</button>
-					<button className="google-btn social-btn" onClick={() => navigate('/dashboard')}>GitHub</button>
-				</div>
+						<div className="password-row">
+							<label className="field-label">Password</label>
+							<button
+								type="button"
+								className="forgot-link"
+								onClick={() => setShowSignUpPassword((prev) => !prev)}
+							>
+								{showSignUpPassword ? 'Hide' : 'See'} password
+							</button>
+						</div>
+						<input
+							placeholder="••••••••"
+							type={showSignUpPassword ? 'text' : 'password'}
+							value={signUpPassword}
+							onChange={(e) => setSignUpPassword(e.target.value)}
+							required
+						/>
+
+						<label className="field-label">Confirm Password</label>
+						<input
+							placeholder="••••••••"
+							type={showSignUpPassword ? 'text' : 'password'}
+							value={confirmPassword}
+							onChange={(e) => setConfirmPassword(e.target.value)}
+							required
+						/>
+
+						<button className="primary-btn full login-submit" type="submit" disabled={submitting}>
+							{submitting ? 'Signing up...' : 'Create account'}
+						</button>
+					</form>
+				)}
+
+				{error && <p className="error">{error}</p>}
+				{message && <p className="subtle-copy">{message}</p>}
 			</section>
 		</div>
 	)
