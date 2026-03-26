@@ -1,4 +1,7 @@
-from typing import Dict, List
+import os
+import time
+from collections import defaultdict, deque
+from typing import Deque, Dict, List
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,10 +50,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.get("/health")
+async def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/ping")
+async def ping() -> Dict[str, str]:
+    return {"message": "pong"}
+
 # In-memory storage just for demo purposes
-_JOBS: Dict[str, RoleRequirementGraph] = {}
-_CANDIDATES: Dict[str, CandidateProfile] = {}
-_SKILL_GRAPHS: Dict[str, SkillGraph] = {}
+_JOBS: Dict[str, Dict[str, RoleRequirementGraph]] = {}
+_CANDIDATES: Dict[str, Dict[str, CandidateProfile]] = {}
+_SKILL_GRAPHS: Dict[str, Dict[str, SkillGraph]] = {}
 
 _job_agent = JobIntelligenceAgent()
 _talent_agent = TalentScoutAgent()
@@ -59,11 +72,57 @@ _match_agent = MatchingAndRankingAgent()
 _bias_agent = BiasAuditorAgent()
 _copilot_agent = RecruiterCopilotAgent()
 
+_MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", "5242880"))
+_RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
+_DEFAULT_RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS_PER_WINDOW", "120"))
+_ROUTE_RATE_LIMITS = {
+    "/jobs/extract-jd-pdf": 20,
+    "/candidates/extract-resume-pdf": 30,
+    "/match": 30,
+    "/copilot": 90,
+    "/codeforces": 60,
+}
+
+
+def _owner_id(user: Dict) -> str:
+    owner = str(user.get("sub") or user.get("user_id") or "").strip()
+    if not owner:
+        raise HTTPException(status_code=401, detail="Invalid auth token payload")
+    return owner
+
+
+def _store_for_owner(store: Dict[str, Dict], owner: str) -> Dict:
+    return store.setdefault(owner, {})
+
+
+def _enforce_rate_limit(owner: str, route: str) -> None:
+    buckets: Dict[str, Deque[float]] = getattr(app.state, "rate_limit_buckets", None)
+    if buckets is None:
+        buckets = defaultdict(deque)
+        app.state.rate_limit_buckets = buckets
+
+    now = time.time()
+    window_start = now - _RATE_LIMIT_WINDOW_SECONDS
+    key = f"{owner}:{route}"
+    bucket = buckets[key]
+
+    while bucket and bucket[0] < window_start:
+        bucket.popleft()
+
+    max_requests = _ROUTE_RATE_LIMITS.get(route, _DEFAULT_RATE_LIMIT_REQUESTS)
+    if len(bucket) >= max_requests:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please retry shortly.")
+
+    bucket.append(now)
+
 
 @app.post("/jobs", response_model=JobDescription)
 async def create_job(req: CreateJobRequest, user=Depends(get_current_user)) -> JobDescription:
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/jobs")
+    jobs = _store_for_owner(_JOBS, owner)
     graph = _job_agent.build_role_graph(job_id=req.job_id, title=req.title, description=req.description)
-    _JOBS[req.job_id] = graph
+    jobs[req.job_id] = graph
     return graph.job
 
 
@@ -72,13 +131,29 @@ async def extract_jd_pdf(
     file: UploadFile = File(...),
     user=Depends(get_current_user),
 ) -> ExtractJobDescriptionResponse:
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/jobs/extract-jd-pdf")
+
     filename = (file.filename or "").lower()
     if not filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF file.")
 
-    raw = await file.read()
+    if file.content_type and file.content_type not in {
+        "application/pdf",
+        "application/x-pdf",
+        "application/octet-stream",
+        "binary/octet-stream",
+    }:
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a valid PDF.")
+
+    raw = await file.read(_MAX_UPLOAD_BYTES + 1)
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded PDF is empty.")
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploaded PDF is too large. Max allowed size is {_MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
 
     try:
         extracted = extract_text_from_pdf_bytes(raw)
@@ -99,13 +174,29 @@ async def extract_candidate_resume_pdf(
     file: UploadFile = File(...),
     user=Depends(get_current_user),
 ) -> ExtractResumeResponse:
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/candidates/extract-resume-pdf")
+
     filename = (file.filename or "").lower()
     if not filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a resume PDF file.")
 
-    raw = await file.read()
+    if file.content_type and file.content_type not in {
+        "application/pdf",
+        "application/x-pdf",
+        "application/octet-stream",
+        "binary/octet-stream",
+    }:
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a valid resume PDF.")
+
+    raw = await file.read(_MAX_UPLOAD_BYTES + 1)
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded resume file is empty.")
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploaded resume PDF is too large. Max allowed size is {_MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
 
     try:
         extracted = extract_text_from_resume_bytes(raw)
@@ -128,7 +219,10 @@ async def extract_candidate_resume_pdf(
 
 @app.get("/jobs/{job_id}", response_model=JobDescription)
 async def get_job(job_id: str, user=Depends(get_current_user)) -> JobDescription:
-    graph = _JOBS.get(job_id)
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/jobs/{job_id}")
+    jobs = _store_for_owner(_JOBS, owner)
+    graph = jobs.get(job_id)
     if not graph:
         raise HTTPException(status_code=404, detail="Job not found")
     return graph.job
@@ -136,6 +230,11 @@ async def get_job(job_id: str, user=Depends(get_current_user)) -> JobDescription
 
 @app.post("/candidates", response_model=CandidateProfile)
 async def create_candidate(req: CreateCandidateRequest, user=Depends(get_current_user)) -> CandidateProfile:
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/candidates")
+    candidates = _store_for_owner(_CANDIDATES, owner)
+    skill_graphs = _store_for_owner(_SKILL_GRAPHS, owner)
+
     profile = CandidateProfile(
         id=req.candidate_id,
         name=req.name,
@@ -147,15 +246,18 @@ async def create_candidate(req: CreateCandidateRequest, user=Depends(get_current
     signals: TalentSignals = _talent_agent.gather_signals(profile)
     graph: SkillGraph = _skill_agent.build_skill_graph(signals)
 
-    _CANDIDATES[profile.id] = profile
-    _SKILL_GRAPHS[profile.id] = graph
+    candidates[profile.id] = profile
+    skill_graphs[profile.id] = graph
 
     return profile
 
 
 @app.get("/candidates/{candidate_id}", response_model=CandidateProfile)
 async def get_candidate(candidate_id: str, user=Depends(get_current_user)) -> CandidateProfile:
-    cand = _CANDIDATES.get(candidate_id)
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/candidates/{candidate_id}")
+    candidates = _store_for_owner(_CANDIDATES, owner)
+    cand = candidates.get(candidate_id)
     if not cand:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return cand
@@ -163,13 +265,19 @@ async def get_candidate(candidate_id: str, user=Depends(get_current_user)) -> Ca
 
 @app.post("/match", response_model=RunMatchingResponse)
 async def run_matching(req: RunMatchingRequest, user=Depends(get_current_user)) -> RunMatchingResponse:
-    job_graph = _JOBS.get(req.job_id)
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/match")
+    jobs = _store_for_owner(_JOBS, owner)
+    candidates = _store_for_owner(_CANDIDATES, owner)
+    skill_graphs = _store_for_owner(_SKILL_GRAPHS, owner)
+
+    job_graph = jobs.get(req.job_id)
     if not job_graph:
         raise HTTPException(status_code=404, detail="Job not found")
 
     graphs: List[SkillGraph] = []
     for cid in req.candidate_ids:
-        sg = _SKILL_GRAPHS.get(cid)
+        sg = skill_graphs.get(cid)
         if sg is not None:
             graphs.append(sg)
 
@@ -177,7 +285,7 @@ async def run_matching(req: RunMatchingRequest, user=Depends(get_current_user)) 
         raise HTTPException(status_code=400, detail="No candidates with skill graphs available")
 
     ranked_scores = _match_agent.rank_candidates(job_graph.job, graphs)
-    candidates_by_id = {cid: _CANDIDATES[cid] for cid in req.candidate_ids if cid in _CANDIDATES}
+    candidates_by_id = {cid: candidates[cid] for cid in req.candidate_ids if cid in candidates}
     audit_logs = _bias_agent.audit(job_graph.job.id, ranked_scores, candidates_by_id)
 
     ranked = [
@@ -198,15 +306,19 @@ async def run_matching(req: RunMatchingRequest, user=Depends(get_current_user)) 
 
     # Store audit logs in memory keyed by job
     app.state.audit_logs = getattr(app.state, "audit_logs", {})
-    app.state.audit_logs[req.job_id] = audit_logs
+    owner_logs = app.state.audit_logs.setdefault(owner, {})
+    owner_logs[req.job_id] = audit_logs
 
     return RunMatchingResponse(job_id=req.job_id, ranked=ranked)
 
 
 @app.get("/audit/{job_id}", response_model=AuditLogResponse)
 async def get_audit(job_id: str, user=Depends(get_current_user)) -> AuditLogResponse:
-    all_logs: Dict[str, List] = getattr(app.state, "audit_logs", {})
-    logs = all_logs.get(job_id, [])
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/audit/{job_id}")
+    all_logs: Dict[str, Dict[str, List]] = getattr(app.state, "audit_logs", {})
+    owner_logs = all_logs.get(owner, {})
+    logs = owner_logs.get(job_id, [])
 
     entries = [
         AuditEntryResponse(
@@ -221,31 +333,37 @@ async def get_audit(job_id: str, user=Depends(get_current_user)) -> AuditLogResp
 
 @app.post("/copilot", response_model=CopilotResponse)
 async def copilot(query: CopilotQueryRequest, user=Depends(get_current_user)) -> CopilotResponse:
-    job_graph = _JOBS.get(query.job_id)
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/copilot")
+    jobs = _store_for_owner(_JOBS, owner)
+    candidates_store = _store_for_owner(_CANDIDATES, owner)
+    graphs_store = _store_for_owner(_SKILL_GRAPHS, owner)
+
+    job_graph = jobs.get(query.job_id)
     if not job_graph:
         raise HTTPException(status_code=404, detail="Job not found")
 
     if query.candidate_id:
-        cand = _CANDIDATES.get(query.candidate_id)
-        graph = _SKILL_GRAPHS.get(query.candidate_id)
+        cand = candidates_store.get(query.candidate_id)
+        graph = graphs_store.get(query.candidate_id)
         if not cand or not graph:
             raise HTTPException(status_code=404, detail="Candidate or skill graph not found")
 
         ranked_scores = _match_agent.rank_candidates(job_graph.job, [graph])
         match = ranked_scores[0] if ranked_scores else None
 
-        all_logs: Dict[str, List] = getattr(app.state, "audit_logs", {})
-        logs_for_job = all_logs.get(query.job_id, [])
+        all_logs: Dict[str, Dict[str, List]] = getattr(app.state, "audit_logs", {})
+        logs_for_job = all_logs.get(owner, {}).get(query.job_id, [])
         audit = next((l for l in logs_for_job if l.candidate_id == cand.id), None)
 
         answer = _copilot_agent.summarize_candidate(cand, graph, match, audit)
         return CopilotResponse(answer=answer)
 
     # Otherwise summarize the whole shortlist if we have logs
-    all_logs: Dict[str, List] = getattr(app.state, "audit_logs", {})
-    logs_for_job = all_logs.get(query.job_id, [])
-    candidates = list(_CANDIDATES.values())
-    graphs = list(_SKILL_GRAPHS.values())
+    all_logs: Dict[str, Dict[str, List]] = getattr(app.state, "audit_logs", {})
+    logs_for_job = all_logs.get(owner, {}).get(query.job_id, [])
+    candidates = list(candidates_store.values())
+    graphs = list(graphs_store.values())
 
     # If we have no matches yet, just describe the role
     if not logs_for_job:
@@ -267,6 +385,8 @@ async def copilot(query: CopilotQueryRequest, user=Depends(get_current_user)) ->
 
 @app.get("/codeforces/{handle}/analysis", response_model=CodeforcesAnalysisResponse)
 async def codeforces_analysis(handle: str, user=Depends(get_current_user)) -> CodeforcesAnalysisResponse:
+    owner = _owner_id(user)
+    _enforce_rate_limit(owner, "/codeforces")
     try:
         data = analyze_codeforces_handle(handle)
         return CodeforcesAnalysisResponse(**data)
