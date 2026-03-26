@@ -69,8 +69,8 @@ README.md
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+source .venv311/bin/activate
+pip3 install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 

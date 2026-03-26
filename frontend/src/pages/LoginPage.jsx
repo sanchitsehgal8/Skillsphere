@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage({ theme, onToggleTheme }) {
 	const navigate = useNavigate()
-	const { user, signIn, signUp } = useAuth()
+	const { user, signIn, signUp, signInWithGoogle } = useAuth()
 	const [tab, setTab] = useState('signin')
 	const [signInEmail, setSignInEmail] = useState('')
 	const [signInPassword, setSignInPassword] = useState('')
@@ -56,6 +56,16 @@ export default function LoginPage({ theme, onToggleTheme }) {
 
 		setMessage('Check your email to confirm your account.')
 		setSubmitting(false)
+	}
+
+	async function handleGoogleSignIn() {
+		setError('')
+		setMessage('')
+		try {
+			await signInWithGoogle()
+		} catch (e) {
+			setError(e?.message || 'Google sign-in failed')
+		}
 	}
 
 	return (
@@ -131,7 +141,7 @@ export default function LoginPage({ theme, onToggleTheme }) {
 				<div className="social-row" role="tablist" aria-label="Auth tabs">
 					<button
 						type="button"
-						className="google-btn social-btn"
+						className="ghost-btn social-btn"
 						onClick={() => {
 							setTab('signin')
 							setError('')
@@ -142,7 +152,7 @@ export default function LoginPage({ theme, onToggleTheme }) {
 					</button>
 					<button
 						type="button"
-						className="google-btn social-btn"
+						className="ghost-btn social-btn"
 						onClick={() => {
 							setTab('signup')
 							setError('')
@@ -229,6 +239,22 @@ export default function LoginPage({ theme, onToggleTheme }) {
 						</button>
 					</form>
 				)}
+
+				<div className="divider-or" aria-hidden>
+					<span />
+					<em>or</em>
+					<span />
+				</div>
+
+				<button type="button" className="google-btn" onClick={handleGoogleSignIn}>
+					<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+						<path fill="#EA4335" d="M9 7.03v3.95h5.49c-.24 1.27-.96 2.35-2.04 3.07l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.72-.06-1.4-.19-2.09H9Z" />
+						<path fill="#34A853" d="M3.64 10.71l-.74.56-2.61 2.03A8.99 8.99 0 0 0 9 18c2.43 0 4.47-.8 5.96-2.16l-3.3-2.56c-.91.61-2.08.97-3.66.97-2.35 0-4.33-1.58-5.04-3.71l-.32.17Z" />
+						<path fill="#4A90E2" d="M.29 4.7A8.98 8.98 0 0 0 0 9c0 1.56.37 3.03 1.03 4.3l3.35-2.59A5.41 5.41 0 0 1 4.08 9c0-.6.1-1.18.3-1.71L1.03 4.7.29 4.7Z" />
+						<path fill="#FBBC05" d="M9 3.58c1.32 0 2.5.45 3.43 1.33l2.57-2.57C13.46.9 11.42 0 9 0A8.99 8.99 0 0 0 .29 4.7l3.35 2.59C4.35 5.16 6.33 3.58 9 3.58Z" />
+					</svg>
+					<span>Continue with Google</span>
+				</button>
 
 				{error && <p className="error">{error}</p>}
 				{message && <p className="subtle-copy">{message}</p>}

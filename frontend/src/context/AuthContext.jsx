@@ -47,8 +47,16 @@ export function AuthProvider({ children }) {
     return supabase.auth.signOut()
   }
 
+  const signInWithGoogle = () =>
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/dashboard',
+      },
+    })
+
   const value = useMemo(
-    () => ({ user, session, loading, signIn, signUp, signOut }),
+    () => ({ user, session, loading, signIn, signUp, signOut, signInWithGoogle }),
     [user, session, loading],
   )
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
+import AuthCallback from './pages/AuthCallback'
 import DashboardPage from './pages/DashboardPage'
 import CandidatesPage from './pages/CandidatesPage'
 import AnalyzePage from './pages/AnalyzePage'
@@ -27,7 +28,7 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
     setAnalyses((prev) => [...items, ...prev])
   }
 
-  const isLoginRoute = location.pathname === '/login'
+  const isLoginRoute = location.pathname === '/login' || location.pathname === '/auth/callback'
 
   return (
     <div className={`app-shell ${isLoginRoute ? 'login-layout' : ''}`}>
@@ -35,6 +36,7 @@ function AppLayout({ analyses, setAnalyses, theme, onToggleTheme }) {
       <main className={`main ${isLoginRoute ? 'main-login' : ''}`}>
         <Routes>
           <Route path="/login" element={<LoginPage theme={theme} onToggleTheme={onToggleTheme} />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           <Route element={<PrivateRoute />}>
             <Route
