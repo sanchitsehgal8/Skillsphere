@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 from collections import defaultdict, deque
 from typing import Deque, Dict, List
 
@@ -35,6 +36,10 @@ from app.services.resume_parser import (
     infer_years_experience,
 )
 from app.auth import get_current_user
+from app.services.persistence import persistence, PersistenceError
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("skillsphere.api")
 
 
 def _get_cors_origins() -> List[str]:
@@ -62,17 +67,15 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health() -> Dict[str, str]:
-    return {"status": "ok"}
+async def health() -> Dict[str, object]:
+    return {"success": True, "data": {"status": "ok"}}
 
 
 @app.get("/ping")
-async def ping() -> Dict[str, str]:
-    return {"message": "pong"}
+async def ping() -> Dict[str, object]:
+    return {"success": True, "data": {"message": "pong"}}
 
-# In-memory storage just for demo purposes
-_JOBS: Dict[str, Dict[str, RoleRequirementGraph]] = {}
-_CANDIDATES: Dict[str, Dict[str, CandidateProfile]] = {}
+# In-memory storage retained for ephemeral computed state.
 _SKILL_GRAPHS: Dict[str, Dict[str, SkillGraph]] = {}
 
 _job_agent = JobIntelligenceAgent()
@@ -92,6 +95,13 @@ _ROUTE_RATE_LIMITS = {
     "/copilot": 90,
     "/codeforces": 60,
 }
+
+
+@app.on_event("startup")
+async def validate_runtime_config() -> None:
+    assert os.getenv("SUPABASE_JWT_SECRET"), "SUPABASE_JWT_SECRET is required"
+    assert os.getenv("CORS_ORIGINS"), "CORS_ORIGINS is required"
+    logger.info("Runtime config validated successfully")
 
 
 def _owner_id(user: Dict) -> str:
@@ -130,9 +140,14 @@ def _enforce_rate_limit(owner: str, route: str) -> None:
 async def create_job(req: CreateJobRequest, user=Depends(get_current_user)) -> JobDescription:
     owner = _owner_id(user)
     _enforce_rate_limit(owner, "/jobs")
-    jobs = _store_for_owner(_JOBS, owner)
     graph = _job_agent.build_role_graph(job_id=req.job_id, title=req.title, description=req.description)
-    jobs[req.job_id] = graph
+
+    try:
+        persistence.upsert_job(owner, graph.job)
+    except PersistenceError as exc:
+        logger.exception("Failed to persist job")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     return graph.job
 
 
@@ -231,18 +246,21 @@ async def extract_candidate_resume_pdf(
 async def get_job(job_id: str, user=Depends(get_current_user)) -> JobDescription:
     owner = _owner_id(user)
     _enforce_rate_limit(owner, "/jobs/{job_id}")
-    jobs = _store_for_owner(_JOBS, owner)
-    graph = jobs.get(job_id)
-    if not graph:
+    try:
+        job = persistence.get_job(owner, job_id)
+    except PersistenceError as exc:
+        logger.exception("Failed to fetch job")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return graph.job
+    return job
 
 
 @app.post("/candidates", response_model=CandidateProfile)
 async def create_candidate(req: CreateCandidateRequest, user=Depends(get_current_user)) -> CandidateProfile:
     owner = _owner_id(user)
     _enforce_rate_limit(owner, "/candidates")
-    candidates = _store_for_owner(_CANDIDATES, owner)
     skill_graphs = _store_for_owner(_SKILL_GRAPHS, owner)
 
     profile = CandidateProfile(
@@ -256,7 +274,12 @@ async def create_candidate(req: CreateCandidateRequest, user=Depends(get_current
     signals: TalentSignals = _talent_agent.gather_signals(profile)
     graph: SkillGraph = _skill_agent.build_skill_graph(signals)
 
-    candidates[profile.id] = profile
+    try:
+        persistence.upsert_candidate(owner, profile)
+    except PersistenceError as exc:
+        logger.exception("Failed to persist candidate")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     skill_graphs[profile.id] = graph
 
     return profile
@@ -266,8 +289,12 @@ async def create_candidate(req: CreateCandidateRequest, user=Depends(get_current
 async def get_candidate(candidate_id: str, user=Depends(get_current_user)) -> CandidateProfile:
     owner = _owner_id(user)
     _enforce_rate_limit(owner, "/candidates/{candidate_id}")
-    candidates = _store_for_owner(_CANDIDATES, owner)
-    cand = candidates.get(candidate_id)
+    try:
+        cand = persistence.get_candidate(owner, candidate_id)
+    except PersistenceError as exc:
+        logger.exception("Failed to fetch candidate")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     if not cand:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return cand
@@ -277,25 +304,47 @@ async def get_candidate(candidate_id: str, user=Depends(get_current_user)) -> Ca
 async def run_matching(req: RunMatchingRequest, user=Depends(get_current_user)) -> RunMatchingResponse:
     owner = _owner_id(user)
     _enforce_rate_limit(owner, "/match")
-    jobs = _store_for_owner(_JOBS, owner)
-    candidates = _store_for_owner(_CANDIDATES, owner)
     skill_graphs = _store_for_owner(_SKILL_GRAPHS, owner)
 
-    job_graph = jobs.get(req.job_id)
-    if not job_graph:
+    try:
+        persisted_job = persistence.get_job(owner, req.job_id)
+    except PersistenceError as exc:
+        logger.exception("Failed to fetch job for matching")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not persisted_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    job_graph = _job_agent.build_role_graph(
+        job_id=persisted_job.id,
+        title=persisted_job.title,
+        description=persisted_job.description,
+    )
+
     graphs: List[SkillGraph] = []
+    candidates_by_id: Dict[str, CandidateProfile] = {}
     for cid in req.candidate_ids:
+        try:
+            cand = persistence.get_candidate(owner, cid)
+        except PersistenceError as exc:
+            logger.exception("Failed to fetch candidate for matching")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+        if cand is None:
+            continue
+
+        candidates_by_id[cid] = cand
         sg = skill_graphs.get(cid)
-        if sg is not None:
-            graphs.append(sg)
+        if sg is None:
+            signals: TalentSignals = _talent_agent.gather_signals(cand)
+            sg = _skill_agent.build_skill_graph(signals)
+            skill_graphs[cid] = sg
+        graphs.append(sg)
 
     if not graphs:
         raise HTTPException(status_code=400, detail="No candidates with skill graphs available")
 
     ranked_scores = _match_agent.rank_candidates(job_graph.job, graphs)
-    candidates_by_id = {cid: candidates[cid] for cid in req.candidate_ids if cid in candidates}
     audit_logs = _bias_agent.audit(job_graph.job.id, ranked_scores, candidates_by_id)
 
     ranked = [
@@ -345,17 +394,36 @@ async def get_audit(job_id: str, user=Depends(get_current_user)) -> AuditLogResp
 async def copilot(query: CopilotQueryRequest, user=Depends(get_current_user)) -> CopilotResponse:
     owner = _owner_id(user)
     _enforce_rate_limit(owner, "/copilot")
-    jobs = _store_for_owner(_JOBS, owner)
-    candidates_store = _store_for_owner(_CANDIDATES, owner)
     graphs_store = _store_for_owner(_SKILL_GRAPHS, owner)
 
-    job_graph = jobs.get(query.job_id)
-    if not job_graph:
+    try:
+        persisted_job = persistence.get_job(owner, query.job_id)
+    except PersistenceError as exc:
+        logger.exception("Failed to fetch job for copilot")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not persisted_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    job_graph = _job_agent.build_role_graph(
+        job_id=persisted_job.id,
+        title=persisted_job.title,
+        description=persisted_job.description,
+    )
+
     if query.candidate_id:
-        cand = candidates_store.get(query.candidate_id)
+        try:
+            cand = persistence.get_candidate(owner, query.candidate_id)
+        except PersistenceError as exc:
+            logger.exception("Failed to fetch candidate for copilot")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
         graph = graphs_store.get(query.candidate_id)
+        if cand and graph is None:
+            signals: TalentSignals = _talent_agent.gather_signals(cand)
+            graph = _skill_agent.build_skill_graph(signals)
+            graphs_store[query.candidate_id] = graph
+
         if not cand or not graph:
             raise HTTPException(status_code=404, detail="Candidate or skill graph not found")
 
@@ -372,8 +440,20 @@ async def copilot(query: CopilotQueryRequest, user=Depends(get_current_user)) ->
     # Otherwise summarize the whole shortlist if we have logs
     all_logs: Dict[str, Dict[str, List]] = getattr(app.state, "audit_logs", {})
     logs_for_job = all_logs.get(owner, {}).get(query.job_id, [])
-    candidates = list(candidates_store.values())
-    graphs = list(graphs_store.values())
+    try:
+        candidates = persistence.list_candidates(owner)
+    except PersistenceError as exc:
+        logger.exception("Failed to list candidates for copilot")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    graphs: List[SkillGraph] = []
+    for cand in candidates:
+        graph = graphs_store.get(cand.id)
+        if graph is None:
+            signals: TalentSignals = _talent_agent.gather_signals(cand)
+            graph = _skill_agent.build_skill_graph(signals)
+            graphs_store[cand.id] = graph
+        graphs.append(graph)
 
     # If we have no matches yet, just describe the role
     if not logs_for_job:
