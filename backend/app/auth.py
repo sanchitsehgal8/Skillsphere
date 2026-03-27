@@ -1,41 +1,26 @@
 import os
-from typing import Any, Dict
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import ExpiredSignatureError, JWTError, jwt
+from fastapi import Header, HTTPException
+from supabase import create_client
 
-bearer_scheme = HTTPBearer(auto_error=False)
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-) -> Dict[str, Any]:
-    if credentials is None or not credentials.credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing bearer token.",
-        )
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
-    token = credentials.credentials
-    secret = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
-    if not secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="SUPABASE_JWT_SECRET is not configured",
-        )
+supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+
+async def get_current_user(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
 
     try:
-        payload = jwt.decode(
-            token,
-            secret,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-    except ExpiredSignatureError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired") from exc
-    except JWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+        token = authorization.split(" ")[1]
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid auth header format")
 
-    if not payload.get("sub"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    user = supabase.auth.get_user(token)
 
-    return payload
+    if not user or not user.user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return user.user.model_dump()

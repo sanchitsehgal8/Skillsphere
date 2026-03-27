@@ -43,10 +43,23 @@ logger = logging.getLogger("skillsphere.api")
 
 
 def _get_cors_origins() -> List[str]:
-    raw = os.environ.get("CORS_ORIGINS", "")
-    if raw.strip():
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    """
+    Load allowed CORS origins from environment variable.
 
+    Example env value:
+    CORS_ORIGINS=https://skillsphere-4fk.pages.dev,http://localhost:3000
+    """
+
+    raw = os.environ.get("CORS_ORIGINS", "")
+
+    if raw.strip():
+        return [
+            origin.strip()
+            for origin in raw.split(",")
+            if origin.strip()
+        ]
+
+    # Safe fallback defaults (local dev only)
     return [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -59,7 +72,8 @@ app = FastAPI(title="SkillSphere Talent Intelligence Engine")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_cors_origins(),
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    # Allow Cloudflare Pages preview + production URLs
+    allow_origin_regex=r"https://.*\.pages\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -100,7 +114,8 @@ _ROUTE_RATE_LIMITS = {
 @app.on_event("startup")
 async def validate_runtime_config() -> None:
     assert os.getenv("SUPABASE_JWT_SECRET"), "SUPABASE_JWT_SECRET is required"
-    assert os.getenv("CORS_ORIGINS"), "CORS_ORIGINS is required"
+    if not os.getenv("CORS_ORIGINS"):
+        logger.warning("CORS_ORIGINS not set — falling back to localhost defaults")
     logger.info("Runtime config validated successfully")
 
 

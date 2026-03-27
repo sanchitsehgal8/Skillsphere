@@ -89,7 +89,7 @@ npm run dev
 Frontend:
 - App: http://127.0.0.1:5173
 
-If needed, set `VITE_API_BASE` in frontend env to point to backend (defaults to `http://127.0.0.1:8000`).
+If needed, set `VITE_API_BASE_URL` in frontend env to point to backend (e.g. `https://your-backend.example.com`).
 
 ---
 
