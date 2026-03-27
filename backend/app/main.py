@@ -36,15 +36,25 @@ from app.services.resume_parser import (
 )
 from app.auth import get_current_user
 
-app = FastAPI(title="SkillSphere Talent Intelligence Engine")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+
+def _get_cors_origins() -> List[str]:
+    raw = os.environ.get("CORS_ORIGINS", "")
+    if raw.strip():
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+    return [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-    ],
+    ]
+
+
+app = FastAPI(title="SkillSphere Talent Intelligence Engine")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_get_cors_origins(),
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
