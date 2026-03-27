@@ -120,7 +120,7 @@ async def validate_runtime_config() -> None:
 
 
 def _owner_id(user: Dict) -> str:
-    owner = str(user.get("sub") or user.get("user_id") or "").strip()
+    owner = str(user.get("id") or "").strip()
     if not owner:
         raise HTTPException(status_code=401, detail="Invalid auth token payload")
     return owner
