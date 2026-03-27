@@ -1,6 +1,7 @@
 # SkillSphere
 
 SkillSphere is a full-stack talent intelligence platform for recruiter workflows. It combines a React frontend with a FastAPI backend and an agent-style scoring pipeline to analyze candidate fit beyond keyword matching.
+working link: https://skillsphere-4fk.pages.dev/login
 
 ---
 
