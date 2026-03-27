@@ -120,7 +120,23 @@ async def validate_runtime_config() -> None:
 
 
 def _owner_id(user: Dict) -> str:
-    owner = str(user.get("id") or "").strip()
+    owner = str(
+        user.get("id")
+        or user.get("sub")
+        or user.get("user_id")
+        or user.get("uid")
+        or ""
+    ).strip()
+    if not owner:
+        nested_user = user.get("user") if isinstance(user, dict) else None
+        if isinstance(nested_user, dict):
+            owner = str(
+                nested_user.get("id")
+                or nested_user.get("sub")
+                or nested_user.get("user_id")
+                or ""
+            ).strip()
+
     if not owner:
         raise HTTPException(status_code=401, detail="Invalid auth token payload")
     return owner
