@@ -136,7 +136,12 @@ celerybeat.pid
 
 # Environments
 .env
-.envrc
+# frontend
+cd front# frontend
+cd frontend
+npm ci
+npm run build
+npm run previewrc
 frontend/.env
 backend/.env
 .venv
