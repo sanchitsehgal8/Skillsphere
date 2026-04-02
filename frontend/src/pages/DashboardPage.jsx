@@ -206,52 +206,54 @@ export default function DashboardPage({ analyses, theme, onToggleTheme }) {
           </button>
         </div>
 
-        <div className="table-head-grid dashboard-table-head">
-          <span>Candidate</span>
-          <span>Score</span>
-          <span>Time to Productivity</span>
-          <span>Reasoning</span>
-          <span></span>
-        </div>
-
-        {rows.map((r) => (
-          <div className="table-row-grid dashboard-table-row" key={r.candidateId}>
-            <div className="candidate-cell">
-              <div className="candidate-avatar">{r.initials}</div>
-              <div>
-                <p className="candidate-name">{r.candidateId}</p>
-                <p className="candidate-sub">{r.role}</p>
-              </div>
-            </div>
-            <div className={`score-cell-modern tone-${r.tone}`}>
-              <strong>{Math.round(r.score * 100)}</strong>
-              <div className="score-progress"><div className="score-progress-fill" style={{ width: `${Math.round(r.score * 100)}%` }} /></div>
-            </div>
-            <div><span className="time-pill">{r.ttp}</span></div>
-            <div className="reason-cell">{r.reason}</div>
-            <button className="details-link" onClick={() => navigate('/candidates')}>Details →</button>
+        <div className="table-scroll-wrap">
+          <div className="table-head-grid dashboard-table-head">
+            <span>Candidate</span>
+            <span>Score</span>
+            <span>Time to Productivity</span>
+            <span>Reasoning</span>
+            <span></span>
           </div>
-        ))}
 
-        <div className="table-footer-modern">
-          <span>
-            SHOWING {visibleRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, visibleRows.length)} OF {visibleRows.length} ENTRIES
-          </span>
-          <div className="pagination">
-            <button className="pg-btn" onClick={() => onPageChange(safePage - 1)} disabled={safePage === 1}>‹</button>
-            {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
-              const p = i + 1
-              return (
-                <button
-                  key={`dashboard-pg-${p}`}
-                  className={`pg-btn ${p === safePage ? 'active' : ''}`}
-                  onClick={() => onPageChange(p)}
-                >
-                  {p}
-                </button>
-              )
-            })}
-            <button className="pg-btn" onClick={() => onPageChange(safePage + 1)} disabled={safePage === totalPages}>›</button>
+          {rows.map((r) => (
+            <div className="table-row-grid dashboard-table-row" key={r.candidateId}>
+              <div className="candidate-cell">
+                <div className="candidate-avatar">{r.initials}</div>
+                <div>
+                  <p className="candidate-name">{r.candidateId}</p>
+                  <p className="candidate-sub">{r.role}</p>
+                </div>
+              </div>
+              <div className={`score-cell-modern tone-${r.tone}`}>
+                <strong>{Math.round(r.score * 100)}</strong>
+                <div className="score-progress"><div className="score-progress-fill" style={{ width: `${Math.round(r.score * 100)}%` }} /></div>
+              </div>
+              <div><span className="time-pill">{r.ttp}</span></div>
+              <div className="reason-cell">{r.reason}</div>
+              <button className="details-link" onClick={() => navigate('/candidates')}>Details →</button>
+            </div>
+          ))}
+
+          <div className="table-footer-modern">
+            <span>
+              SHOWING {visibleRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, visibleRows.length)} OF {visibleRows.length} ENTRIES
+            </span>
+            <div className="pagination">
+              <button className="pg-btn" onClick={() => onPageChange(safePage - 1)} disabled={safePage === 1}>‹</button>
+              {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
+                const p = i + 1
+                return (
+                  <button
+                    key={`dashboard-pg-${p}`}
+                    className={`pg-btn ${p === safePage ? 'active' : ''}`}
+                    onClick={() => onPageChange(p)}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+              <button className="pg-btn" onClick={() => onPageChange(safePage + 1)} disabled={safePage === totalPages}>›</button>
+            </div>
           </div>
         </div>
       </div>

@@ -180,82 +180,85 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
       </section>
 
       <section className="card modern-table-card candidates-table-card">
-        <div className="table-head-grid">
-          <span>Candidate</span>
-          <span>Score</span>
-          <span>Time to Productivity</span>
-          <span>Signals</span>
-        </div>
-
-        {pagedItems.length === 0 && (
-          <div className="empty-state">
-            <p>No candidates match the current filters.</p>
+        <div className="table-scroll-wrap">
+          <div className="table-head-grid">
+            <span>Candidate</span>
+            <span>Score</span>
+            <span>Time to Productivity</span>
+            <span>Signals</span>
           </div>
-        )}
 
-        {pagedItems.map((item) => {
-          const scorePercent = Math.round((item.score || 0) * 100)
-          const ttpText = item.time_to_productivity_pomodoros
-            ? `${Math.max(1, Math.round((item.time_to_productivity_hours || 0) / 10))}-${Math.max(2, Math.round((item.time_to_productivity_hours || 0) / 8))} weeks`
-            : 'Pending'
+          {pagedItems.length === 0 && (
+            <div className="empty-state">
+              <p>No candidates match the current filters.</p>
+            </div>
+          )}
 
-          return (
-            <article className="table-row-grid" key={item.candidateId}>
-              <div className="candidate-cell">
-                <div className="candidate-avatar">{item.candidateId.slice(0, 2).toUpperCase()}</div>
+          {pagedItems.map((item) => {
+            const scorePercent = Math.round((item.score || 0) * 100)
+            const ttpText = item.time_to_productivity_pomodoros
+              ? `${Math.max(1, Math.round((item.time_to_productivity_hours || 0) / 10))}-${Math.max(2, Math.round((item.time_to_productivity_hours || 0) / 8))} weeks`
+              : 'Pending'
+
+            return (
+              <article className="table-row-grid" key={item.candidateId}>
+                <div className="candidate-cell">
+                  <div className="candidate-avatar">{item.candidateId.slice(0, 2).toUpperCase()}</div>
+                  <div>
+                    <p className="candidate-name">{item.candidateId}</p>
+                    <p className="candidate-sub">{item.direct_matches?.[0] || 'Candidate profile'}</p>
+                  </div>
+                </div>
+
+                <div className="score-cell-modern score-percent-cell">
+                  <strong>{scorePercent}%</strong>
+                  <div className="score-progress">
+                    <div className="score-progress-fill" style={{ width: `${scorePercent}%` }} />
+                  </div>
+                </div>
+
                 <div>
-                  <p className="candidate-name">{item.candidateId}</p>
-                  <p className="candidate-sub">{item.direct_matches?.[0] || 'Candidate profile'}</p>
+                  <span className="time-pill">{ttpText}</span>
                 </div>
-              </div>
 
-              <div className="score-cell-modern score-percent-cell">
-                <strong>{scorePercent}%</strong>
-                <div className="score-progress">
-                  <div className="score-progress-fill" style={{ width: `${scorePercent}%` }} />
+                <div className="signals-cell">
+                  <div className="signals-list">
+                    {(item.direct_matches || []).slice(0, 1).map((t) => (
+                      <span className="tag-chip" key={`${item.candidateId}-d-${t}`}>{t}</span>
+                    ))}
+                    {(item.adjacent_support || []).slice(0, 1).map((t) => (
+                      <span className="tag-chip alt" key={`${item.candidateId}-a-${t}`}>{t}</span>
+                    ))}
+                    {(item.direct_matches || []).length === 0 && (item.adjacent_support || []).length === 0 && (
+                      <span className="badge-soft">Strategic hire</span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <span className="time-pill">{ttpText}</span>
-              </div>
+              </article>
+            )
+          })}
 
-              <div className="signals-cell">
-                <div className="signals-list">
-                  {(item.direct_matches || []).slice(0, 1).map((t) => (
-                    <span className="tag-chip" key={`${item.candidateId}-d-${t}`}>{t}</span>
-                  ))}
-                  {(item.adjacent_support || []).slice(0, 1).map((t) => (
-                    <span className="tag-chip alt" key={`${item.candidateId}-a-${t}`}>{t}</span>
-                  ))}
-                  {(item.direct_matches || []).length === 0 && (item.adjacent_support || []).length === 0 && (
-                    <span className="badge-soft">Strategic hire</span>
-                  )}
-                </div>
-              </div>
-            </article>
-          )
-        })}
-
-        <div className="table-footer-modern">
-          <span>
-            Showing {filteredItems.length === 0 ? 0 : (safePage - 1) * pageSize + 1} of {filteredItems.length} entries
-          </span>
-          <div className="pagination">
-            <button className="pg-btn" onClick={() => onPageChange(safePage - 1)} disabled={safePage === 1}>‹</button>
-            {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
-              const p = i + 1
-              return (
-                <button
-                  key={`pg-${p}`}
-                  className={`pg-btn ${p === safePage ? 'active' : ''}`}
-                  onClick={() => onPageChange(p)}
-                >
-                  {p}
-                </button>
-              )
-            })}
-            <button className="pg-btn" onClick={() => onPageChange(safePage + 1)} disabled={safePage === totalPages}>›</button>
+          <div className="table-footer-modern">
+            <span>
+              Showing {filteredItems.length === 0 ? 0 : (safePage - 1) * pageSize + 1} of {filteredItems.length} entries
+            </span>
+            <div className="pagination">
+              <button className="pg-btn" onClick={() => onPageChange(safePage - 1)} disabled={safePage === 1}>‹</button>
+              {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
+                const p = i + 1
+                return (
+                  <button
+                    key={`pg-${p}`}
+                    className={`pg-btn ${p === safePage ? 'active' : ''}`}
+                    onClick={() => onPageChange(p)}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+              <button className="pg-btn" onClick={() => onPageChange(safePage + 1)} disabled={safePage === totalPages}>›</button>
+            </div>
           </div>
         </div>
       </section>

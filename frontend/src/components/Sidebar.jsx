@@ -1,5 +1,7 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import MobileTopNav from './MobileTopNav'
+import NavItem from './NavItem'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -22,40 +24,42 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-top">
-        <div className="logo-area">
-          <div className="brand-wrap">
-            <h1 className="brand">SkillSphere</h1>
+    <>
+      <MobileTopNav onLogout={handleLogout} />
+
+      <aside className="sidebar desktop-sidebar">
+        <div className="sidebar-top">
+          <div className="logo-area">
+            <div className="brand-wrap">
+              <h1 className="brand">SkillSphere</h1>
+            </div>
           </div>
+
+          <nav className="nav">
+            {navItems.map((item) => (
+              <NavItem
+                key={item.to}
+                to={item.to}
+                label={item.label}
+              />
+            ))}
+          </nav>
+
+          <p className="nav-section-label">System</p>
+          <nav className="nav nav-system">
+            <NavItem asButton label="Settings" onClick={handleSettings} />
+            <NavItem asButton label="Logout" onClick={handleLogout} />
+          </nav>
         </div>
 
-        <nav className="nav">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <p className="nav-section-label">System</p>
-        <nav className="nav nav-system">
-          <button type="button" className="nav-item nav-plain" onClick={handleSettings}>Settings</button>
-          <button type="button" className="nav-item nav-plain" onClick={handleLogout}>Logout</button>
-        </nav>
-      </div>
-
-      <button type="button" className="sidebar-foot sidebar-profile-trigger" onClick={() => navigate('/profile')}>
-        <div className="avatar">AR</div>
-        <div>
-          <div className="user-name">Alex Rivers</div>
-          <div className="user-role">Recruitment Lead</div>
-        </div>
-      </button>
-    </aside>
+        <button type="button" className="sidebar-foot sidebar-profile-trigger" onClick={() => navigate('/profile')}>
+          <div className="avatar">AR</div>
+          <div>
+            <div className="user-name">Alex Rivers</div>
+            <div className="user-role">Recruitment Lead</div>
+          </div>
+        </button>
+      </aside>
+    </>
   )
 }

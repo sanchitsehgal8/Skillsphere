@@ -20,7 +20,8 @@ export default function ProfilePage({ theme, onToggleTheme }) {
       const parsed = JSON.parse(saved)
       setProfile((prev) => ({ ...prev, ...parsed }))
     } catch {
-      // ignore corrupted profile data
+      // ignore corrupted profil
+      // e data
     }
   }, [])
 
