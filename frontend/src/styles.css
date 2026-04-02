@@ -3284,3 +3284,12 @@ body {
     grid-column: 2;
   }
 }
+
+/* Keep analysis result cards from stretching too wide */
+@media (min-width: 768px) {
+  .analyze-page .result-grid {
+    width: min(100%, 980px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
