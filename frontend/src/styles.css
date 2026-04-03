@@ -2897,6 +2897,8 @@ body {
 }
 
 .table-scroll-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -2904,7 +2906,15 @@ body {
 .table-scroll-wrap .table-head-grid,
 .table-scroll-wrap .table-row-grid,
 .table-scroll-wrap .table-footer-modern {
-  min-width: 760px;
+  min-width: 0;
+}
+
+@media (min-width: 769px) {
+  .table-scroll-wrap .table-head-grid,
+  .table-scroll-wrap .table-row-grid,
+  .table-scroll-wrap .table-footer-modern {
+    min-width: 760px;
+  }
 }
 
 .page-title {
