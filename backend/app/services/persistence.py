@@ -51,6 +51,13 @@ def _is_rls_error(exc: Exception) -> bool:
     return "row-level security" in str(exc).lower()
 
 
+def _is_invalid_api_key_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    if "invalid api key" in text:
+        return True
+    return str(getattr(exc, "code", "")) == "401"
+
+
 def _wrap(action: str, exc: Exception) -> PersistenceError:
     """Attach an actionable hint when the underlying cause is a known,
     self-diagnosable misconfiguration rather than a genuine transient error."""
@@ -63,6 +70,18 @@ def _wrap(action: str, exc: Exception) -> PersistenceError:
             "dashboard -> Project Settings -> API -> 'service_role' secret), which "
             "bypasses RLS by design — or disable RLS on the affected table. "
             f"Original error: {exc}"
+        )
+    if _is_invalid_api_key_error(exc):
+        return PersistenceError(
+            f"Failed to {action}: Supabase rejected the API key itself (not a policy "
+            "issue — the key value is wrong, truncated, or from a different project). "
+            "Check the deployment's SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL env vars: "
+            "re-copy the 'service_role' secret fresh from Supabase dashboard -> Project "
+            "Settings -> API, paste into a plain text editor first to rule out truncated "
+            "copy-paste, confirm SUPABASE_URL's project ref matches the key's project, "
+            "and confirm it isn't swapped with SUPABASE_JWT_SECRET (that one is a short "
+            "UUID-like string, not a long eyJ... JWT). Redeploy after fixing — env var "
+            f"edits don't hot-reload. Original error: {exc}"
         )
     return PersistenceError(f"Failed to {action}: {exc}")
 
