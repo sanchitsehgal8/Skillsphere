@@ -1,20 +1,11 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { RouteFallback } from './shell/RouteFallback'
 
 export default function PrivateRoute() {
   const { user, loading } = useAuth()
 
-  if (loading === true) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        Loading...
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
+  if (loading === true) return <RouteFallback />
+  if (!user) return <Navigate to="/login" replace />
   return <Outlet />
 }

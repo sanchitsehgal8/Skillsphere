@@ -1,114 +1,174 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import TopBar from '../components/TopBar'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  ArrowRight,
+  ArrowUpDown,
+  ChevronDown,
+  Download,
+  Gauge,
+  RotateCcw,
+  Search,
+  Sparkles,
+  Users,
+} from 'lucide-react'
+import { PageHeading } from '../components/shell/PageHeading'
+import { StatCard } from '../components/common/StatCard'
+import { Pagination } from '../components/common/Pagination'
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Label,
+  Meter,
+  Select,
+  Skeleton,
+  Slider,
+} from '../components/ui'
+import { useToast } from '../components/ui'
+import ScorecardBreakdown from '../components/ScorecardBreakdown'
+import SkillEvidenceList from '../components/SkillEvidenceList'
+import { listCandidates } from '../api/client'
+import { cn, downloadCsv, scoreTone } from '../lib/utils'
 
-export default function CandidatesPage({ analysesByCandidate, theme, onToggleTheme }) {
+const PAGE_SIZE = 6
+
+export default function CandidatesPage() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [searchParams] = useSearchParams()
 
-  const items = Object.values(analysesByCandidate)
+  const [candidates, setCandidates] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [expandedId, setExpandedId] = useState(null)
+
   const [query, setQuery] = useState(searchParams.get('query') || '')
   const [minScore, setMinScore] = useState(0)
-  const [onlyDirect, setOnlyDirect] = useState(false)
-  const [onlyAdjacency, setOnlyAdjacency] = useState(false)
   const [scoreSort, setScoreSort] = useState('default')
   const [page, setPage] = useState(1)
 
-  const filteredItems = useMemo(() => {
-    const filtered = items.filter((item) => {
-      const matchesQuery = item.candidateId.toLowerCase().includes(query.toLowerCase())
-      const matchesScore = (item.score || 0) * 100 >= minScore
-      const hasDirect = (item.direct_matches || []).length > 0
-      const hasAdj = (item.adjacent_support || []).length > 0
-      const matchesDirect = !onlyDirect || hasDirect
-      const matchesAdj = !onlyAdjacency || hasAdj
-      return matchesQuery && matchesScore && matchesDirect && matchesAdj
-    })
-
-    if (scoreSort === 'desc') {
-      filtered.sort((a, b) => (b.score || 0) - (a.score || 0))
-    } else if (scoreSort === 'asc') {
-      filtered.sort((a, b) => (a.score || 0) - (b.score || 0))
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      setLoading(true)
+      setError('')
+      try {
+        const rows = await listCandidates()
+        if (mounted) setCandidates(rows)
+      } catch (e) {
+        if (mounted) setError(e?.response?.data?.detail || e.message || 'Failed to load candidates')
+      } finally {
+        if (mounted) setLoading(false)
+      }
     }
-
-    return filtered
-  }, [items, minScore, onlyAdjacency, onlyDirect, query, scoreSort])
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
-    const q = searchParams.get('query') || ''
-    setQuery(q)
+    setQuery(searchParams.get('query') || '')
     setPage(1)
   }, [searchParams])
 
-  const pageSize = 3
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize))
-  const safePage = Math.min(page, totalPages)
-  const pagedItems = filteredItems.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const filtered = candidates.filter((c) => {
+      const matchesQuery =
+        !q ||
+        c.evidence.name.toLowerCase().includes(q) ||
+        c.evidence.candidate_id.toLowerCase().includes(q)
+      const matchesScore = c.scorecard.overall_score >= minScore
+      return matchesQuery && matchesScore
+    })
+    if (scoreSort === 'desc') filtered.sort((a, b) => b.scorecard.overall_score - a.scorecard.overall_score)
+    if (scoreSort === 'asc') filtered.sort((a, b) => a.scorecard.overall_score - b.scorecard.overall_score)
+    return filtered
+  }, [candidates, minScore, query, scoreSort])
 
-  function onPageChange(nextPage) {
-    setPage(Math.min(totalPages, Math.max(1, nextPage)))
+  const avgScore = candidates.length
+    ? Math.round(candidates.reduce((acc, c) => acc + c.scorecard.overall_score, 0) / candidates.length)
+    : 0
+  const strongCount = candidates.filter((c) => c.scorecard.overall_score >= 75).length
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedItems = filteredItems.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  const filtersActive = query.trim() !== '' || minScore > 0 || scoreSort !== 'default'
+
+  function resetFilters() {
+    setQuery('')
+    setMinScore(0)
+    setScoreSort('default')
+    setPage(1)
   }
 
   function exportCsv() {
-    const headers = ['candidateId', 'score', 'time_to_productivity_pomodoros', 'time_to_productivity_hours', 'time_to_productivity_sprints', 'direct_matches', 'adjacent_support']
-    const source = filteredItems.length
-      ? filteredItems
-      : [
-          {
-            candidateId: 'n/a',
-            score: 0,
-            time_to_productivity_pomodoros: '',
-            time_to_productivity_hours: '',
-            time_to_productivity_sprints: '',
-            direct_matches: ['No candidates match current filters'],
-            adjacent_support: [],
-          },
-        ]
-
-    const rows = source.map((item) => [
-      item.candidateId,
-      item.score,
-      item.time_to_productivity_pomodoros ?? '',
-      item.time_to_productivity_hours ?? '',
-      item.time_to_productivity_sprints ?? '',
-      (item.direct_matches || []).join('|'),
-      (item.adjacent_support || []).join('|'),
-    ])
-
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `skillsphere-candidates-${Date.now()}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    if (!filteredItems.length) {
+      return toast({
+        title: 'Nothing to export',
+        description: candidates.length ? 'No candidates match the current filters.' : 'Analyze a candidate first.',
+        variant: 'info',
+      })
+    }
+    downloadCsv(
+      `skillsphere-candidates-${Date.now()}.csv`,
+      ['candidateId', 'name', 'overallScore', 'confidence', 'evidenceCompleteness', 'topSkills'],
+      filteredItems.map((c) => [
+        c.evidence.candidate_id,
+        c.evidence.name,
+        c.scorecard.overall_score,
+        c.scorecard.overall_confidence,
+        c.scorecard.evidence_completeness,
+        c.scorecard.skills.slice(0, 3).map((s) => s.name).join(' | '),
+      ]),
+    )
+    toast({
+      title: 'Export ready',
+      description: `${filteredItems.length} candidate${filteredItems.length === 1 ? '' : 's'} downloaded.`,
+      variant: 'success',
+    })
   }
 
   return (
-    <div className="page candidates-page">
-      <TopBar
-        title="All Candidates"
-        subtitle="Ranked with direct fit and adjacency potential"
-        onExport={exportCsv}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
+    <div>
+      <PageHeading
+        eyebrow="Talent board"
+        title="All candidates"
+        subtitle="Every analyzed profile with its evidence-based engineering scorecard."
+        actions={
+          <Button variant="outline" onClick={exportCsv}>
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+        }
       />
 
-      <section className="card filter-panel candidates-filter-panel">
-        <div className="filter-bar">
-          <div className="filter-control search-block">
-            <label>Search Handle</label>
-            <div className="search-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                placeholder="Search by candidate handle..."
+      {error && (
+        <div className="mb-6 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard icon={Users} label="Candidates" value={candidates.length} hint="Profiles with a scorecard" tone="primary" delay={0} loading={loading} />
+        <StatCard icon={Gauge} label="Avg score" value={avgScore} suffix="/100" hint="Across the full board" tone="accent" delay={0.06} loading={loading} />
+        <StatCard icon={Sparkles} label="Strong (≥75)" value={strongCount} hint={`Of ${candidates.length} analyzed`} tone="success" delay={0.12} loading={loading} />
+      </div>
+
+      <Card className="mt-6 p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)] lg:items-end">
+          <div>
+            <Label htmlFor="candidate-search">Search</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="candidate-search"
+                className="pl-10"
+                placeholder="Search by name or ID…"
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
@@ -118,178 +178,219 @@ export default function CandidatesPage({ analysesByCandidate, theme, onToggleThe
             </div>
           </div>
 
-          <div className="filter-control score-block">
-            <label>Min Score</label>
-            <div className="score-slider-row">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={minScore}
-                onChange={(e) => {
-                  setMinScore(Number(e.target.value))
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label className="mb-0">Min overall score</Label>
+              <span className="font-mono text-xs font-semibold text-foreground">{minScore}</span>
+            </div>
+            <div className="flex h-11 items-center">
+              <Slider
+                value={[minScore]}
+                onValueChange={([v]) => {
+                  setMinScore(v)
                   setPage(1)
                 }}
+                min={0}
+                max={100}
+                step={1}
+                aria-label="Minimum overall score"
               />
-              <span>{minScore}%</span>
             </div>
           </div>
 
-          <div className="filter-control checkbox-block">
-            <label className="check-inline">
-              <input
-                type="checkbox"
-                checked={onlyDirect}
+          <div>
+            <Label htmlFor="candidate-sort">Sort by</Label>
+            <div className="relative">
+              <ArrowUpDown className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Select
+                id="candidate-sort"
+                className="pl-10"
+                value={scoreSort}
                 onChange={(e) => {
-                  setOnlyDirect(e.target.checked)
+                  setScoreSort(e.target.value)
                   setPage(1)
                 }}
-              />
-              <span className="check-text">Only with direct matches</span>
-            </label>
-
-            <label className="check-inline">
-              <input
-                type="checkbox"
-                checked={onlyAdjacency}
-                onChange={(e) => {
-                  setOnlyAdjacency(e.target.checked)
-                  setPage(1)
-                }}
-              />
-              <span className="check-text">Only with adjacency support</span>
-            </label>
-          </div>
-
-          <div className="sort-control">
-            <label>Sort By</label>
-            <select
-              value={scoreSort}
-              onChange={(e) => {
-                setScoreSort(e.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="default">Score (Default)</option>
-              <option value="desc">High to Low</option>
-              <option value="asc">Low to High</option>
-            </select>
+              >
+                <option value="default">Default order</option>
+                <option value="desc">Score: high to low</option>
+                <option value="asc">Score: low to high</option>
+              </Select>
+            </div>
           </div>
         </div>
-      </section>
 
-      <section className="card modern-table-card candidates-table-card">
-        <div className="table-scroll-wrap">
-          <div className="table-head-grid">
-            <span>Candidate</span>
-            <span>Score</span>
-            <span>Time to Productivity</span>
-            <span>Signals</span>
-          </div>
-
-          {pagedItems.length === 0 && (
-            <div className="empty-state">
-              <p>No candidates match the current filters.</p>
-            </div>
-          )}
-
-          {pagedItems.map((item) => {
-            const scorePercent = Math.round((item.score || 0) * 100)
-            const ttpText = item.time_to_productivity_pomodoros
-              ? `${Math.max(1, Math.round((item.time_to_productivity_hours || 0) / 10))}-${Math.max(2, Math.round((item.time_to_productivity_hours || 0) / 8))} weeks`
-              : 'Pending'
-
-            return (
-              <article className="table-row-grid" key={item.candidateId}>
-                <div className="candidate-cell">
-                  <div className="candidate-avatar">{item.candidateId.slice(0, 2).toUpperCase()}</div>
-                  <div>
-                    <p className="candidate-name">{item.candidateId}</p>
-                    <p className="candidate-sub">{item.direct_matches?.[0] || 'Candidate profile'}</p>
-                  </div>
-                </div>
-
-                <div className="score-cell-modern score-percent-cell">
-                  <strong>{scorePercent}%</strong>
-                  <div className="score-progress">
-                    <div className="score-progress-fill" style={{ width: `${scorePercent}%` }} />
-                  </div>
-                </div>
-
-                <div>
-                  <span className="time-pill">{ttpText}</span>
-                </div>
-
-                <div className="signals-cell">
-                  <div className="signals-list">
-                    {(item.direct_matches || []).slice(0, 1).map((t) => (
-                      <span className="tag-chip" key={`${item.candidateId}-d-${t}`}>{t}</span>
-                    ))}
-                    {(item.adjacent_support || []).slice(0, 1).map((t) => (
-                      <span className="tag-chip alt" key={`${item.candidateId}-a-${t}`}>{t}</span>
-                    ))}
-                    {(item.direct_matches || []).length === 0 && (item.adjacent_support || []).length === 0 && (
-                      <span className="badge-soft">Strategic hire</span>
-                    )}
-                  </div>
-                </div>
-
-              </article>
-            )
-          })}
-
-          <div className="table-footer-modern">
-            <span>
-              Showing {filteredItems.length === 0 ? 0 : (safePage - 1) * pageSize + 1} of {filteredItems.length} entries
+        {filtersActive && (
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+            <span className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{filteredItems.length}</span> of {candidates.length} match
             </span>
-            <div className="pagination">
-              <button className="pg-btn" onClick={() => onPageChange(safePage - 1)} disabled={safePage === 1}>‹</button>
-              {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
-                const p = i + 1
+            <Button variant="subtle" size="sm" onClick={resetFilters}>
+              <RotateCcw className="h-3.5 w-3.5" /> Reset filters
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      <Card className="mt-6">
+        <div className="hidden items-center gap-4 border-b border-border px-5 py-3 text-2xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid sm:grid-cols-[1.6fr_1.2fr_0.7fr_0.4fr]">
+          <span>Candidate</span>
+          <span>Overall score</span>
+          <span>Confidence</span>
+          <span className="text-right">Detail</span>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3 p-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : !candidates.length ? (
+          <EmptyState
+            icon={Sparkles}
+            title="No candidates analyzed yet"
+            description="Run your first evidence-based analysis to populate the talent board."
+            action={
+              <Button onClick={() => navigate('/analyze')}>
+                Analyze a candidate <ArrowRight className="h-4 w-4" />
+              </Button>
+            }
+          />
+        ) : !filteredItems.length ? (
+          <EmptyState
+            icon={Search}
+            title="No candidates match your filters"
+            description="Try loosening the score threshold or clearing the search query."
+            action={
+              <Button variant="outline" onClick={resetFilters}>
+                <RotateCcw className="h-4 w-4" /> Reset filters
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <div className="divide-y divide-border">
+              {pagedItems.map((c, i) => {
+                const id = c.evidence.candidate_id
+                const isOpen = expandedId === id
+                const score = c.scorecard.overall_score
+                const tone = scoreTone(score)
+                const confidence = Math.round((c.scorecard.overall_confidence || 0) * 100)
                 return (
-                  <button
-                    key={`pg-${p}`}
-                    className={`pg-btn ${p === safePage ? 'active' : ''}`}
-                    onClick={() => onPageChange(p)}
+                  <motion.div
+                    key={id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                   >
-                    {p}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isOpen ? null : id)}
+                      aria-expanded={isOpen}
+                      className={cn(
+                        'grid w-full grid-cols-1 items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40 sm:grid-cols-[1.6fr_1.2fr_0.7fr_0.4fr]',
+                        isOpen && 'bg-secondary/40',
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar name={c.evidence.name} size="md" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{c.evidence.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{c.evidence.headline || id}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="hidden w-32 sm:block">
+                          <Meter value={score} tone={tone} />
+                        </div>
+                        <Badge tone={tone} size="sm">
+                          {score.toFixed(0)}
+                        </Badge>
+                        <div className="ml-1 flex flex-1 flex-wrap gap-1.5 sm:hidden">
+                          {c.scorecard.skills.slice(0, 2).map((s) => (
+                            <Badge key={`${id}-m-${s.name}`} variant="outline" size="sm">
+                              {s.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-mono font-medium text-foreground">{confidence}%</span> conf
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="hidden flex-wrap justify-end gap-1.5 lg:flex">
+                          {c.scorecard.skills.slice(0, 2).map((s) => (
+                            <Badge key={`${id}-${s.name}`} variant="outline" size="sm">
+                              {s.name}
+                            </Badge>
+                          ))}
+                          {!c.scorecard.skills.length && (
+                            <span className="text-2xs text-muted-foreground">No verified skills</span>
+                          )}
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                            isOpen && 'rotate-180',
+                          )}
+                        />
+                      </div>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                          className="overflow-hidden"
+                        >
+                          <div className="space-y-6 border-t border-border bg-surface/30 px-5 py-6">
+                            <section>
+                              <h4 className="mb-3 font-display text-sm font-semibold text-foreground">Full scorecard</h4>
+                              <ScorecardBreakdown dimensions={c.scorecard.dimensions} />
+                            </section>
+                            <section>
+                              <h4 className="mb-3 font-display text-sm font-semibold text-foreground">Verified skills</h4>
+                              <SkillEvidenceList skills={c.scorecard.skills} />
+                            </section>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
                 )
               })}
-              <button className="pg-btn" onClick={() => onPageChange(safePage + 1)} disabled={safePage === totalPages}>›</button>
+            </div>
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onChange={(p) => setPage(Math.min(totalPages, Math.max(1, p)))}
+              total={filteredItems.length}
+              pageSize={PAGE_SIZE}
+            />
+          </>
+        )}
+      </Card>
+
+      {!loading && !!candidates.length && (
+        <Card interactive className="group mt-6 flex cursor-pointer items-center justify-between gap-4 p-5" onClick={() => navigate('/analyze')}>
+          <div className="flex items-center gap-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-display text-base font-semibold">Analyze a new candidate</h3>
+              <p className="text-sm text-muted-foreground">Résumé + GitHub → instant evidence-based score.</p>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="candidate-radar-grid candidates-cta-grid">
-        <button className="card candidate-radar-card cta-card" onClick={() => navigate('/analyze')}>
-          <div>
-            <h4>Analyze New Candidate</h4>
-            <p className="subtle-copy">Run deep AI fit analysis for new talent</p>
-          </div>
-          <span>→</span>
-        </button>
-
-        <button
-          className="card candidate-radar-card cta-card cta-dark"
-          onClick={() => {
-            setQuery('')
-            setOnlyDirect(false)
-            setOnlyAdjacency(false)
-            setScoreSort('default')
-            setMinScore(0)
-            setPage(1)
-          }}
-        >
-          <div>
-            <h4>Full Candidate Pipeline</h4>
-            <p className="subtle-copy">View the full board of active recruits</p>
-          </div>
-          <span>→</span>
-        </button>
-      </section>
+          <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </Card>
+      )}
     </div>
   )
 }

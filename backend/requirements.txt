@@ -1,12 +1,11 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
 pydantic==2.7.0
-streamlit==1.41.0
 requests==2.32.3
-transformers==4.46.3
 pypdf==5.1.0
 httpx==0.28.1
 python-jose[cryptography]==3.3.0
 supabase
 python-dotenv
 python-multipart
+pytest==8.3.3

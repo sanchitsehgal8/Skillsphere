@@ -1,0 +1,214 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   SkillSphere Design System — tokens
+   HSL channels only; Tailwind composes with alpha.
+   Dark-first, full light theme. Toggled via [data-theme].
+   ============================================================ */
+@layer base {
+  /* ---- Warm Ink & Cobalt ----
+     Warm paper/ink neutrals + one disciplined cobalt accent.
+     No cool slate, no rainbow gradients. */
+  :root,
+  :root[data-theme='light'] {
+    --background: 42 30% 95%;
+    --foreground: 36 12% 11%;
+
+    --surface: 44 40% 98%;
+    --surface-muted: 40 22% 93%;
+
+    --card: 44 44% 99%;
+    --card-foreground: 36 12% 11%;
+
+    --popover: 44 44% 99%;
+    --popover-foreground: 36 12% 11%;
+
+    --primary: 214 88% 48%;
+    --primary-foreground: 40 40% 98%;
+
+    --accent: 202 90% 44%;
+    --accent-foreground: 40 40% 98%;
+
+    --secondary: 40 20% 91%;
+    --secondary-foreground: 36 14% 18%;
+
+    --muted: 40 20% 92%;
+    --muted-foreground: 38 8% 40%;
+
+    --success: 152 46% 36%;
+    --success-foreground: 44 40% 98%;
+    --warning: 30 78% 42%;
+    --warning-foreground: 40 40% 98%;
+    --danger: 6 68% 48%;
+    --danger-foreground: 44 40% 98%;
+
+    --border: 40 16% 85%;
+    --input: 40 16% 83%;
+    --ring: 214 88% 48%;
+
+    --shadow-color: 35 35% 22%;
+    --radius: 0.75rem;
+
+    color-scheme: light;
+  }
+
+  :root[data-theme='dark'] {
+    --background: 40 11% 8%;
+    --foreground: 40 18% 90%;
+
+    --surface: 42 11% 11%;
+    --surface-muted: 40 10% 14%;
+
+    --card: 42 11% 11%;
+    --card-foreground: 40 18% 90%;
+
+    --popover: 42 12% 12%;
+    --popover-foreground: 40 18% 90%;
+
+    --primary: 210 100% 66%;
+    --primary-foreground: 214 60% 8%;
+
+    --accent: 198 95% 62%;
+    --accent-foreground: 200 60% 8%;
+
+    --secondary: 40 9% 18%;
+    --secondary-foreground: 40 18% 88%;
+
+    --muted: 40 9% 17%;
+    --muted-foreground: 40 8% 58%;
+
+    --success: 150 50% 52%;
+    --success-foreground: 150 55% 7%;
+    --warning: 34 82% 58%;
+    --warning-foreground: 36 60% 8%;
+    --danger: 6 74% 62%;
+    --danger-foreground: 6 60% 8%;
+
+    --border: 40 8% 20%;
+    --input: 40 8% 22%;
+    --ring: 210 100% 66%;
+
+    --shadow-color: 40 40% 2%;
+    --radius: 0.75rem;
+
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100vh;
+  }
+
+  ::selection {
+    @apply bg-primary/30 text-foreground;
+  }
+
+  /* Focus-visible ring for keyboard users everywhere */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Themed scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Frosted glass surface */
+  .glass {
+    @apply bg-surface/70 backdrop-blur-xl border border-border/70;
+  }
+
+  /* Text gradient helper */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      120deg,
+      hsl(var(--foreground)),
+      hsl(var(--foreground)) 40%,
+      hsl(var(--muted-foreground))
+    );
+  }
+  .text-gradient-brand {
+    @apply text-primary;
+  }
+
+  /* Restrained hairline highlight (top edge catches light) */
+  .ring-gradient {
+    position: relative;
+  }
+  .ring-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(180deg, hsl(var(--foreground) / 0.14), transparent 42%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  .bg-grid {
+    background-size: 44px 44px;
+    @apply bg-grid-fade;
+  }
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  }
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

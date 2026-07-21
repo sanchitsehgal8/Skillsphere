@@ -1,13 +1,32 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from statistics import mean, pstdev
 from typing import Any
 
 import requests
 
+from app.config import settings
 
-CODEFORCES_API = "https://codeforces.com/api"
+CODEFORCES_API = settings.codeforces_api
+
+_HANDLE_RE = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+
+
+def normalize_handle(raw: str) -> str:
+    """Accept a bare handle, ``@handle``, or a full Codeforces profile URL."""
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    url_match = re.search(r"codeforces\.com/profile/([A-Za-z0-9_.-]+)", value, re.I)
+    if url_match:
+        return url_match.group(1)
+    value = value.lstrip("@").strip("/")
+    if "/" in value:
+        value = value.rsplit("/", 1)[-1]
+    match = _HANDLE_RE.fullmatch(value)
+    return value if match else ""
 
 
 def _api(path: str, params: dict[str, Any]) -> Any:
@@ -34,6 +53,9 @@ def _bucket_label(rating: int) -> str:
 
 
 def analyze_codeforces_handle(handle: str) -> dict[str, Any]:
+    handle = normalize_handle(handle)
+    if not handle:
+        raise ValueError("No valid Codeforces handle provided")
     info = _api("user.info", {"handles": handle})[0]
     submissions = _api("user.status", {"handle": handle, "from": 1, "count": 5000})
     rating_history = _api("user.rating", {"handle": handle})

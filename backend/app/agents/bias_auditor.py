@@ -1,177 +1,85 @@
-from typing import Any, Dict, List, Optional
+"""Fairness audit over ranked candidates.
 
-from app.models import BiasFlag, AuditLogEntry, CandidateProfile, MatchScore
+The previous implementation ran a ~1.6GB zero-shot NLI model
+(``facebook/bart-large-mnli``) against the ranking rationale text to detect
+"bias probability." Removed: the rationale text is entirely generated from
+numeric evidence (skill scores, requirement coverage) and structurally cannot
+contain demographic language, so the classifier was analyzing text that had no
+signal to find — a large, slow, failure-prone dependency for no measurable
+benefit (its cold start alone risked never loading in production, silently
+disabling the check either way).
 
+What is actually evidence-based and worth computing:
+- **Group-level disparity**: do candidates in an observed protected group score
+  systematically lower than the rest of the pool?
+- **Rank concentration**: are protected-group candidates disproportionately
+  clustered in the bottom half of the ranking?
 
-class TransformerBiasDetector:
+Both are deterministic, reproducible, and directly inspectable — the numbers
+that trigger a flag are the numbers shown in the flag.
+"""
 
-    def __init__(self, model_name: str = "facebook/bart-large-mnli") -> None:
-        self.model_name = model_name
-        self._classifier = None
-        self._is_ready = False
-        self._init_error: Optional[str] = None
-        self._init_pipeline()
+from __future__ import annotations
 
-    def _init_pipeline(self) -> None:
-        try:
-            from transformers import pipeline  # type: ignore
+from typing import Dict, List
 
-            self._classifier = pipeline("zero-shot-classification", model=self.model_name)
-            self._is_ready = True
-        except Exception as exc:  # noqa: BLE001
-            self._is_ready = False
-            self._init_error = str(exc)
+from app.models import BiasFlag, CandidateEvidence, FairnessReport, MatchResult
 
-    @property
-    def is_ready(self) -> bool:
-        return self._is_ready and self._classifier is not None
-
-    def analyze(self, text: str) -> Dict[str, Any]:
-        """Return transformer-based risk scores for bias in a rationale text."""
-        if not self.is_ready:
-            return {
-                "available": False,
-                "bias_probability": None,
-                "neutral_probability": None,
-                "init_error": self._init_error,
-            }
-
-        labels = [
-            "demographic-biased hiring rationale",
-            "stereotyping or discriminatory hiring language",
-            "neutral skill-based hiring rationale",
-        ]
-
-        try:
-            result = self._classifier(text, candidate_labels=labels, multi_label=True)
-            label_to_score = dict(zip(result["labels"], result["scores"]))
-            demographic_bias = float(label_to_score.get(labels[0], 0.0))
-            stereotyping = float(label_to_score.get(labels[1], 0.0))
-            neutral = float(label_to_score.get(labels[2], 0.0))
-            bias_prob = max(demographic_bias, stereotyping)
-            return {
-                "available": True,
-                "bias_probability": bias_prob,
-                "neutral_probability": neutral,
-                "demographic_bias_probability": demographic_bias,
-                "stereotyping_probability": stereotyping,
-            }
-        except Exception as exc:  # noqa: BLE001
-            return {
-                "available": False,
-                "bias_probability": None,
-                "neutral_probability": None,
-                "init_error": str(exc),
-            }
+_PROTECTED_GENDERS = {"female", "non-binary", "nonbinary"}
+_DISPARITY_FLAG_THRESHOLD = 10.0   # points on a 0-100 fit_score scale
+_DISPARITY_HIGH_THRESHOLD = 18.0
 
 
-_GLOBAL_TRANSFORMER_BIAS_DETECTOR = TransformerBiasDetector()
+def _is_protected(ev: CandidateEvidence) -> bool:
+    gender = (ev.demographics.get("gender") or "").strip().lower()
+    return gender in _PROTECTED_GENDERS
 
 
-class BiasAuditorAgent:
-    """Performs a lightweight fairness pass over ranked candidates.
+def audit(
+    job_id: str,
+    ranked_results: List[MatchResult],
+    candidates_by_id: Dict[str, CandidateEvidence],
+) -> FairnessReport:
+    ranked = sorted(ranked_results, key=lambda r: r.fit_score, reverse=True)
+    protected_ids = {
+        cid for cid, ev in candidates_by_id.items() if isinstance(ev, CandidateEvidence) and _is_protected(ev)
+    }
 
-    We simulate a bias audit by checking for underrepresented demographics
-    and ensuring they are not systematically pushed to the bottom.
-    """
+    protected_scores = [r.fit_score for r in ranked if r.candidate_id in protected_ids]
+    other_scores = [r.fit_score for r in ranked if r.candidate_id not in protected_ids]
+    protected_mean = sum(protected_scores) / len(protected_scores) if protected_scores else None
+    other_mean = sum(other_scores) / len(other_scores) if other_scores else None
+    disparity = (other_mean - protected_mean) if (protected_mean is not None and other_mean is not None) else None
 
-    def audit(
-        self,
-        job_id: str,
-        ranked_scores: List[MatchScore],
-        candidates_by_id: dict,
-    ) -> List[AuditLogEntry]:
-        logs: List[AuditLogEntry] = []
-
-        # Identify protected candidates (very naive heuristic for demo only)
-        protected_ids = set()
-        for c_id, cand in candidates_by_id.items():  # type: ignore[arg-type]
-            if not isinstance(cand, CandidateProfile):
-                continue
-            gender = (cand.demographics.get("gender") or "").lower()
-            if gender in {"female", "non-binary"}:
-                protected_ids.add(c_id)
-
-        # Group-level disparity check (score gap between protected/non-protected groups)
-        protected_scores = [s.score for s in ranked_scores if s.candidate_id in protected_ids]
-        non_protected_scores = [s.score for s in ranked_scores if s.candidate_id not in protected_ids]
-
-        protected_mean = sum(protected_scores) / len(protected_scores) if protected_scores else None
-        non_protected_mean = (
-            sum(non_protected_scores) / len(non_protected_scores) if non_protected_scores else None
-        )
-        disparity_gap = None
-        if protected_mean is not None and non_protected_mean is not None:
-            disparity_gap = non_protected_mean - protected_mean
-
-        for rank, score in enumerate(ranked_scores, start=1):
-            flags: List[BiasFlag] = []
-
-            # Transformer-based candidate-level rationale analysis
-            rationale_text = (
-                f"Candidate {score.candidate_id}. "
-                f"Ranking explanation: {score.explanation}. "
+    flags: List[BiasFlag] = []
+    n = len(ranked)
+    for rank, r in enumerate(ranked, start=1):
+        if r.candidate_id not in protected_ids:
+            continue
+        if rank > n // 2 and n >= 4:
+            flags.append(
+                BiasFlag(
+                    candidate_id=r.candidate_id,
+                    reason=f"Ranked {rank} of {n} — in the bottom half despite belonging to an observed protected group.",
+                    severity="low",
+                )
             )
-            ai_result = _GLOBAL_TRANSFORMER_BIAS_DETECTOR.analyze(rationale_text)
-            ai_bias_probability = ai_result.get("bias_probability")
-
-            if ai_result.get("available") and isinstance(ai_bias_probability, float):
-                if ai_bias_probability >= 0.65:
-                    flags.append(
-                        BiasFlag(
-                            candidate_id=score.candidate_id,
-                            reason=(
-                                "Transformer audit detected potentially demographic or stereotyping bias "
-                                f"in rationale text (risk={ai_bias_probability:.2f})."
-                            ),
-                            severity="high",
-                        )
-                    )
-                elif ai_bias_probability >= 0.45:
-                    flags.append(
-                        BiasFlag(
-                            candidate_id=score.candidate_id,
-                            reason=(
-                                "Transformer audit detected moderate bias risk in rationale text "
-                                f"(risk={ai_bias_probability:.2f})."
-                            ),
-                            severity="medium",
-                        )
-                    )
-
-            if score.candidate_id in protected_ids and rank > len(ranked_scores) // 2:
-                flags.append(
-                    BiasFlag(
-                        candidate_id=score.candidate_id,
-                        reason="Protected demographic appears in lower half of ranking.",
-                        severity="medium",
-                    )
-                )
-
-            if (
-                disparity_gap is not None
-                and disparity_gap > 0.10
-                and score.candidate_id in protected_ids
-            ):
-                flags.append(
-                    BiasFlag(
-                        candidate_id=score.candidate_id,
-                        reason=(
-                            "Group-level disparity detected: protected group average score is "
-                            f"{disparity_gap:.2f} lower than non-protected group."
-                        ),
-                        severity="high" if disparity_gap > 0.18 else "medium",
-                    )
-                )
-
-            logs.append(
-                AuditLogEntry(
-                    job_id=job_id,
-                    candidate_id=score.candidate_id,
-                    original_rank=rank,
-                    adjusted_rank=rank,  # no automatic re-ranking yet
-                    bias_flags=flags,
+        if disparity is not None and disparity > _DISPARITY_FLAG_THRESHOLD:
+            flags.append(
+                BiasFlag(
+                    candidate_id=r.candidate_id,
+                    reason=(
+                        f"Group-level disparity: protected-group average fit score "
+                        f"({protected_mean:.1f}) is {disparity:.1f} points below the rest of the pool "
+                        f"({other_mean:.1f})."
+                    ),
+                    severity="high" if disparity > _DISPARITY_HIGH_THRESHOLD else "medium",
                 )
             )
 
-        return logs
+    note = (
+        f"{len(protected_ids)} of {n} candidate(s) in an observed protected group."
+        if protected_ids else
+        "No demographic data was provided for this candidate pool — fairness audit has no group to compare."
+    )
+    return FairnessReport(job_id=job_id, flags=flags, group_disparity=disparity, note=note)
