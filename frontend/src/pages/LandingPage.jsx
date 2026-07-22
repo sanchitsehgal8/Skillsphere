@@ -102,7 +102,6 @@ function Backdrop() {
 const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'How it works', href: '#how' },
-  { label: 'Pricing', href: '#pricing' },
   { label: 'FAQ', href: '#faq' },
 ]
 
@@ -495,44 +494,6 @@ function Testimonials() {
   )
 }
 
-/* -------------------------------- Pricing -------------------------------- */
-const tiers = [
-  { name: 'Starter', price: '$0', period: '/mo', desc: 'For individual recruiters getting started.', features: ['25 candidate analyses / mo', '17-dimension scorecards', 'GitHub + résumé signals', 'CSV export'], cta: 'Start free', highlight: false },
-  { name: 'Team', price: '$49', period: '/seat/mo', desc: 'For growing talent teams that hire often.', features: ['Unlimited analyses', 'Role-fit matching & adjacency', 'Recruiter copilot', 'Fairness auditing', 'Codeforces benchmarking'], cta: 'Start free trial', highlight: true },
-  { name: 'Enterprise', price: 'Custom', period: '', desc: 'For orgs with compliance and scale needs.', features: ['SSO & audit logs', 'Custom scoring rubrics', 'API access', 'Dedicated support', 'Data residency'], cta: 'Contact sales', highlight: false },
-]
-
-function Pricing() {
-  return (
-    <section id="pricing" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-28 sm:px-6">
-      <Reveal className="mx-auto max-w-2xl text-center">
-        <Badge variant="primary">Pricing</Badge>
-        <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Start free, scale when you do</h2>
-        <p className="mt-3 text-muted-foreground">Transparent plans. No per-hire fees. Cancel anytime.</p>
-      </Reveal>
-      <div className="mt-14 grid gap-5 lg:grid-cols-3">
-        {tiers.map((t, i) => (
-          <Reveal key={t.name} delay={i * 0.1}>
-            <div className={cn('relative flex h-full flex-col rounded-2xl border bg-card p-7 transition-transform duration-300 hover:-translate-y-1', t.highlight ? 'border-primary/40 shadow-glow' : 'border-border')}>
-              {t.highlight && <Badge variant="primary" className="absolute -top-3 left-1/2 -translate-x-1/2">Most popular</Badge>}
-              <p className="font-display text-lg font-semibold text-foreground">{t.name}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{t.desc}</p>
-              <div className="mt-5 flex items-baseline gap-1">
-                <span className="font-display text-4xl font-bold tracking-tight text-foreground">{t.price}</span>
-                <span className="text-sm text-muted-foreground">{t.period}</span>
-              </div>
-              <ul className="mt-6 flex-1 space-y-3">
-                {t.features.map((f) => <li key={f} className="flex items-start gap-2.5 text-sm text-foreground/85"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> {f}</li>)}
-              </ul>
-              <Link to="/login" className="mt-7"><Button variant={t.highlight ? 'gradient' : 'outline'} className="w-full">{t.cta}</Button></Link>
-            </div>
-          </Reveal>
-        ))}
-      </div>
-    </section>
-  )
-}
-
 /* ---------------------------------- FAQ ---------------------------------- */
 const faqs = [
   { q: 'How does SkillSphere score candidates?', a: 'It analyzes observable evidence — GitHub repositories, résumé content, and optional Codeforces history — into 17 explainable dimensions. Each dimension carries its own score, confidence, reasoning, and cited evidence, and dimensions with little evidence contribute less to the overall score automatically.' },
@@ -588,7 +549,7 @@ function FinalCTA() {
 /* -------------------------------- Footer --------------------------------- */
 function Footer() {
   const cols = [
-    { title: 'Product', links: ['Features', 'Pricing', 'How it works', 'Changelog'] },
+    { title: 'Product', links: ['Features', 'How it works', 'Changelog'] },
     { title: 'Company', links: ['About', 'Careers', 'Blog', 'Contact'] },
     { title: 'Legal', links: ['Privacy', 'Terms', 'Security', 'DPA'] },
   ]
@@ -630,7 +591,6 @@ export default function LandingPage() {
         <HowItWorks />
         <Pipeline />
         <Testimonials />
-        <Pricing />
         <FAQ />
         <FinalCTA />
       </main>
