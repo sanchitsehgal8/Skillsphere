@@ -132,12 +132,34 @@ class SupabasePersistence:
     def _get_client(self) -> Client:
         if self._client is not None:
             return self._client
-        if not settings.supabase_url or not settings.supabase_service_key:
+
+        if not settings.supabase_url:
             raise PersistenceError(
-                "Supabase persistence is not configured. Set SUPABASE_URL and "
-                "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY for local dev)."
+                "SUPABASE_URL is missing."
             )
-        self._client = create_client(settings.supabase_url, settings.supabase_service_key)
+
+        if not settings.supabase_service_key:
+            raise PersistenceError(
+                "SUPABASE_SERVICE_ROLE_KEY is missing."
+            )
+
+        logger.info("=" * 60)
+        logger.info(f"SUPABASE_URL = {settings.supabase_url}")
+        logger.info(f"SUPABASE_KEY_PREFIX = {settings.supabase_service_key[:20]}")
+        logger.info(f"SUPABASE_KEY_LENGTH = {len(settings.supabase_service_key)}")
+        logger.info("=" * 60)
+
+        try:
+            self._client = create_client(
+            settings.supabase_url,
+            settings.supabase_service_key,
+                )
+            logger.info("Supabase client created successfully.")
+
+        except Exception as e:
+            logger.exception(f"Failed to create Supabase client: {e}")
+            raise
+
         return self._client
 
     def _warn_fallback(self, action: str, exc: Exception) -> None:

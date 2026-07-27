@@ -1,0 +1,21 @@
+# robots.txt — SkillSphere
+# https://skillsphere-4fk.pages.dev
+
+User-agent: *
+Allow: /$
+Allow: /login
+
+# Authenticated app routes: no public content for crawlers to index
+# (they redirect to /login, which would create duplicate/soft-404 signals).
+Disallow: /dashboard
+Disallow: /candidates
+Disallow: /analyze
+Disallow: /copilot
+Disallow: /settings
+Disallow: /profile
+Disallow: /auth/
+
+# Don't waste crawl budget on hashed build assets
+Disallow: /assets/
+
+Sitemap: https://skillsphere-4fk.pages.dev/sitemap.xml

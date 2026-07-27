@@ -41,12 +41,8 @@ class Settings:
     # --- Auth / Supabase ---
     supabase_jwt_secret: str = _get("SUPABASE_JWT_SECRET")
     supabase_url: str = _get("SUPABASE_URL") or _get("VITE_SUPABASE_URL")
-    supabase_service_key: str = (
-        _get("SUPABASE_SERVICE_ROLE_KEY")
-        or _get("SUPABASE_ANON_KEY")
-        or _get("VITE_SUPABASE_ANON_KEY")
-    )
-
+    supabase_service_key = _get("SUPABASE_SERVICE_ROLE_KEY")
+    
     # --- AI engine (Hugging Face Inference Providers) ---
     llm_enabled: bool = _get_bool("LLM_ENABLED", True)
     hf_api_token: str = _get("HF_API_TOKEN") or _get("HUGGINGFACE_API_TOKEN")

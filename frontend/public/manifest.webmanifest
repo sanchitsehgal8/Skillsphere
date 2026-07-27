@@ -1,0 +1,27 @@
+{
+  "name": "SkillSphere — Evidence-based AI talent intelligence",
+  "short_name": "SkillSphere",
+  "description": "Score engineering candidates on 17 explainable dimensions from real GitHub, résumé, and Codeforces evidence, with role-fit matching and built-in fairness auditing.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#171613",
+  "theme_color": "#0F6CE6",
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/favicon-16.png", "sizes": "16x16", "type": "image/png" },
+    { "src": "/favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Analyze a candidate", "short_name": "Analyze", "url": "/analyze" },
+    { "name": "Dashboard", "short_name": "Dashboard", "url": "/dashboard" }
+  ]
+}
