@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: SkillSphere FastAPI backend on AWS Lambda + HTTP API
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 1024
+    Architectures:
+      - x86_64
+
+Resources:
+  SkillsphereApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: skillsphere-api
+      CodeUri: backend/
+      Handler: app.lambda_handler.handler
+      Environment:
+        Variables:
+          SUPABASE_JWT_SECRET: ""
+          SUPABASE_URL: ""
+          SUPABASE_SERVICE_ROLE_KEY: ""
+          HF_API_TOKEN: ""
+          GITHUB_TOKEN: ""
+          CORS_ORIGINS: "http://localhost:5173"
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTP API endpoint
+    Value:
+      Fn::Sub: "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
